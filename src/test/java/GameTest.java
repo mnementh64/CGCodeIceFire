@@ -9,8 +9,6 @@ public class GameTest
 	@Test
 	public void test_create() throws Exception
 	{
-		Game.initConsts(0);
-
 		String raw = "0 0 0 0 0 0 6 " +
 				"0 0 0 0.5 400 -2430 4794 0 0 -1 -1 " +
 				"1 0 1 0.5 400 -2937 -4501 0 0 -1 -1 " +
@@ -18,7 +16,7 @@ public class GameTest
 				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		Game game = new Game();
+		Player.Game game = new Player.Game(0);
 		game.createFromInputLines(new Scanner(raw));
 
 		Assert.assertTrue(game.innerPlayers.size() == 3);
@@ -36,8 +34,6 @@ public class GameTest
 	@Test
 	public void test_update() throws Exception
 	{
-		Game.initConsts(0);
-
 		String step1 = "0 0 0 0 0 0 6 " +
 				"0 0 0 0.5 400 -2430 4794 0 0 -1 -1 " +
 				"1 0 1 0.5 400 -2937 -4501 0 0 -1 -1 " +
@@ -45,7 +41,7 @@ public class GameTest
 				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		Game game = new Game();
+		Player.Game game = new Player.Game(0);
 		game.createFromInputLines(new Scanner(step1));
 
 		String step2 = "0 5 8 0 0 0 6 " +
@@ -82,8 +78,6 @@ public class GameTest
 	@Test
 	public void test_simulate_two_turns_only_position() throws Exception
 	{
-		Game.initConsts(0);
-
 		// init game
 		String step1 = "0 0 0 0 0 0 6 " +
 				"0 0 0 0.5 400 -2430 4794 0 0 -1 -1 " +
@@ -92,7 +86,7 @@ public class GameTest
 				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		Game game = new Game();
+		Player.Game game = new Player.Game(0);
 		game.createFromInputLines(new Scanner(step1));
 
 		// handle players outputs
@@ -122,8 +116,6 @@ public class GameTest
 	@Test
 	public void test_simulate_three_turns_only_position() throws Exception
 	{
-		Game.initConsts(0);
-
 		// init game
 		String step1 = "0 0 0 0 0 0 6 " +
 				"0 0 0 0.5 400 -2430 4794 0 0 -1 -1 " +
@@ -132,7 +124,7 @@ public class GameTest
 				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		Game game = new Game();
+		Player.Game game = new Player.Game(0);
 		game.createFromInputLines(new Scanner(step1));
 
 		// handle players outputs --------------------- ROUND 2
@@ -182,8 +174,6 @@ public class GameTest
 	@Test
 	public void test_simulate_multiple_turns() throws Exception
 	{
-		Game.initConsts(0);
-
 		// init game
 		String step1 = "0 0 0 0 0 0 6 " +
 				"0 0 0 0.5 400 -2430 4794 0 0 -1 -1 " +
@@ -192,7 +182,7 @@ public class GameTest
 				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		Game game = new Game();
+		Player.Game game = new Player.Game(0);
 		game.createFromInputLines(new Scanner(step1));
 
 		// handle players outputs --------------------- ROUND 2
@@ -234,7 +224,7 @@ public class GameTest
 		assertLooperPosition(game, 2, 751, -2747);
 	}
 
-	private void handleActions(Game game, String[] outputs) throws Exception
+	private void handleActions(Player.Game game, String[] outputs) throws Exception
 	{
 		String[] outputs0 = new String[]
 		{ outputs[0], outputs[1], outputs[2] };
@@ -247,7 +237,7 @@ public class GameTest
 		game.handlePlayerOutput(1, 1, 2, outputs2);
 	}
 
-	private void assertLooperPosition(Game game, int playerIndex, int x, int y)
+	private void assertLooperPosition(Player.Game game, int playerIndex, int x, int y)
 	{
 		System.out.println("Player " + playerIndex + " : " + game.looterIdToLooterMap.get(playerIndex).x + "," + game.looterIdToLooterMap.get(playerIndex).y);
 		Assert.assertTrue(game.looterIdToLooterMap.get(playerIndex).x == x);
