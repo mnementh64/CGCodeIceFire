@@ -1,6 +1,4 @@
-import java.io.*;
-import java.math.*;
-import java.util.*;
+import java.util.Scanner;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -23,6 +21,7 @@ class Player
 			int enemyRage1 = in.nextInt();
 			int enemyRage2 = in.nextInt();
 			int unitCount = in.nextInt();
+			System.err.println(myScore + " " + enemyScore1 + " " + enemyScore2 + " " + myRage + " " + enemyRage1 + " " + enemyRage2 + " " + unitCount);
 			for (int i = 0; i < unitCount; i++)
 			{
 				int unitId = in.nextInt();
@@ -36,6 +35,9 @@ class Player
 				int vy = in.nextInt();
 				int extra = in.nextInt();
 				int extra2 = in.nextInt();
+				String row = unitId + " " + unitType + " " + player + " " + mass + " " + radius + " " + x + " " + y + " " + vx + " " + vy + " " + extra + " "
+						+ extra2;
+				System.err.println(row);
 			}
 
 			// Write an action using System.out.println()
@@ -47,3 +49,4 @@ class Player
 		}
 	}
 }
+
