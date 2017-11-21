@@ -1,3 +1,4 @@
+import java.util.Arrays;
 import java.util.Scanner;
 
 import org.junit.Assert;
@@ -90,12 +91,10 @@ public class GameTest
 		game.createFromInputLines(new Scanner(step1));
 
 		// handle players outputs
-		handleActions(game, new String[]
-		{
-				"WAIT", "WAIT", "WAIT",
-				"1770 -2422 200", "WAIT", "WAIT",
-				"1770 -2422 200", "WAIT", "WAIT"
-		});
+		game.handleActions(Arrays.asList(
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait()));
 
 		// update game
 		game.updateGame(2);
@@ -135,12 +134,10 @@ public class GameTest
 //				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 //				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 //				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		handleActions(game, new String[]
-		{
-				"WAIT", "WAIT", "WAIT",
-				"1770 -2422 200", "WAIT", "WAIT",
-				"1770 -2422 200", "WAIT", "WAIT"
-		});
+		game.handleActions(Arrays.asList(
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait()));
 
 		// update game
 		game.updateGame(2);
@@ -156,12 +153,10 @@ public class GameTest
 //				"3 4 -1 -1.0 850 1213 2744 0 0 9 -1 " +
 //				"4 4 -1 -1.0 850 -2983 -322 0 0 9 -1 " +
 //				"5 4 -1 -1.0 850 1770 -2422 0 0 9 -1";
-		handleActions(game, new String[]
-		{
-				"WAIT", "WAIT", "WAIT",
-				"1770 -2422 200", "WAIT", "WAIT",
-				"1770 -2422 200", "WAIT", "WAIT"
-		});
+		game.handleActions(Arrays.asList(
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait()));
 
 		// update game
 		game.updateGame(2);
@@ -188,12 +183,10 @@ public class GameTest
 		// handle players outputs --------------------- ROUND 2
 		for (int i = 1; i <= 11; i++)
 		{
-			handleActions(game, new String[]
-			{
-					"WAIT", "WAIT", "WAIT",
-					"1770 -2422 200", "WAIT", "WAIT",
-					"1770 -2422 200", "WAIT", "WAIT"
-			});
+			game.handleActions(Arrays.asList(
+					Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
+					Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait(),
+					Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait()));
 
 			// update game
 			game.updateGame(1 + i);
@@ -201,12 +194,10 @@ public class GameTest
 
 		for (int i = 1; i <= 3; i++)
 		{
-			handleActions(game, new String[]
-			{
-					"WAIT", "WAIT", "WAIT",
-					"723 -2912 200", "WAIT", "WAIT",
-					"723 -2912 200", "WAIT", "WAIT"
-			});
+			game.handleActions(Arrays.asList(
+					Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
+					Player.Game.actionMove(723, -2912, 200), Player.Game.actionWait(), Player.Game.actionWait(),
+					Player.Game.actionMove(723, -2912, 200), Player.Game.actionWait(), Player.Game.actionWait()));
 
 			// update game
 			game.updateGame(12 + i);
@@ -256,12 +247,10 @@ public class GameTest
 		game.updateFromInputLines(new Scanner(step3));
 
 		// simulate a move
-		handleActions(game, new String[]
-		{
-				"1770 -2422 200", "WAIT", "WAIT",
-				"WAIT", "WAIT", "WAIT",
-				"WAIT", "WAIT", "WAIT"
-		});
+		game.handleActions(Arrays.asList(
+				Player.Game.actionMove(1770, -2422, 200), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait()));
 
 		// update game
 		game.updateGame(2);
@@ -295,20 +284,13 @@ public class GameTest
 
 		Player.Game duplicateGame = new Player.Game(game);
 
-//		Assert.assertTrue(game.looterIdToLooterMap.get(0).vy == -678);
-	}
-
-	private void handleActions(Player.Game game, String[] outputs) throws Exception
-	{
-		String[] outputs0 = new String[]
-		{ outputs[0], outputs[1], outputs[2] };
-		game.handlePlayerOutput(1, 1, 0, outputs0);
-		String[] outputs1 = new String[]
-		{ outputs[3], outputs[4], outputs[5] };
-		game.handlePlayerOutput(1, 1, 1, outputs1);
-		String[] outputs2 = new String[]
-		{ outputs[6], outputs[7], outputs[8] };
-		game.handlePlayerOutput(1, 1, 2, outputs2);
+		Assert.assertTrue(duplicateGame.innerPlayers.get(0).looters.length == game.innerPlayers.get(0).looters.length);
+		Assert.assertTrue(duplicateGame.looters.get(0).x == game.looters.get(0).x);
+		Assert.assertTrue(duplicateGame.looters.get(0).y == game.looters.get(0).y);
+		Assert.assertTrue(duplicateGame.looters.get(0).vx == game.looters.get(0).vx);
+		Assert.assertTrue(duplicateGame.looters.get(0).vy == game.looters.get(0).vy);
+		Assert.assertTrue(duplicateGame.wrecks.get(0).x == game.wrecks.get(0).x);
+		Assert.assertTrue(duplicateGame.wrecks.get(0).y == game.wrecks.get(0).y);
 	}
 
 	private void assertLooperPosition(Player.Game game, int playerIndex, int x, int y)

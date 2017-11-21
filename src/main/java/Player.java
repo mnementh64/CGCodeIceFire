@@ -1,5 +1,3 @@
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -12,18 +10,13 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Auto-generated code below aims at helping you parse
- * the standard input according to the problem statement.
- **/
 class Player
 {
 
-	static boolean DEBUG = true;
+	static boolean DEBUG = false;
 	static Game game = new Game(0);
 	static int round = 1;
 
@@ -45,12 +38,12 @@ class Player
 			}
 
 			System.err.println("Init done in " + (System.currentTimeMillis() - t0) + "ms");
-			List<String> actions = game.findBestAction(t0);
+			List<Game.SavePoint.Action> actions = game.findBestAction(t0);
 
 			// Write an action using System.out.println()
 			// To debug: System.err.println("Debug messages...");
 
-			actions.forEach(System.out::println);
+			actions.stream().map(Game.SavePoint.Action::toString).forEach(System.out::println);
 
 			round++;
 			System.err.println("Round done in " + (System.currentTimeMillis() - t0) + "ms");
@@ -60,7 +53,7 @@ class Player
 	static class Game
 	{
 
-		private static final long GAME_TIME_LIMIT = 50L;
+		private static final long GAME_TIME_LIMIT = 40;
 		private static int GAME_VERSION = 3;
 
 		static boolean SPAWN_WRECK = false;
@@ -173,12 +166,6 @@ class Player
 		// The null collision
 		final static Collision NULL_COLLISION = new Collision(1.0 + EPSILON);
 
-		private static final Pattern PLAYER_MOVE_PATTERN = Pattern
-				.compile("(?<x>-?[0-9]{1,9})\\s+(?<y>-?[0-9]{1,9})\\s+(?<power>([0-9]{1,9}))?(?:\\s+(?<message>.+))?");
-		private static final Pattern PLAYER_SKILL_PATTERN = Pattern.compile("SKILL\\s+(?<x>-?[0-9]{1,9})\\s+(?<y>-?[0-9]{1,9})(?:\\s+(?<message>.+))?",
-				Pattern.CASE_INSENSITIVE);
-		private static final Pattern PLAYER_WAIT_PATTERN = Pattern.compile("WAIT(?:\\s+(?<message>.+))?", Pattern.CASE_INSENSITIVE);
-
 		long seed;
 		int playerCount = 3;
 		List<Unit> units;
@@ -202,20 +189,36 @@ class Player
 
 				int x;
 				int y;
-				int what; // 1=WAIT, 2=MOVE, 3=SKILL
+				int extra;
+				Game.Action what;
 
-				public static SavePoint.Action from(int x, int y, int what)
+				@Override
+				public String toString()
 				{
-					SavePoint.Action action = new Action();
-					action.x = x;
-					action.y = y;
-					action.what = what;
-					return action;
+					return what.equals(Game.Action.MOVE) ? x + " " + y + " " + extra : what.equals(Game.Action.WAIT) ? "WAIT" : "SKILL !";
 				}
 			}
 
 			List<Action> actions;
 			Game game;
+			int value;
+		}
+
+		public static SavePoint.Action actionWait()
+		{
+			SavePoint.Action action = new SavePoint.Action();
+			action.what = Action.WAIT;
+			return action;
+		}
+
+		public static SavePoint.Action actionMove(int x, int y, int thrust)
+		{
+			SavePoint.Action action = new SavePoint.Action();
+			action.what = Action.MOVE;
+			action.x = x;
+			action.y = y;
+			action.extra = thrust;
+			return action;
 		}
 
 		public Game(Game game)
@@ -244,7 +247,7 @@ class Player
 			}
 
 			// copy tankers
-			tankers.forEach(tankerModel ->
+			game.tankers.forEach(tankerModel ->
 			{
 				Tanker tanker = new Tanker(tankerModel.size, null);
 				copyUnit(tankerModel, tanker);
@@ -255,7 +258,7 @@ class Player
 			});
 
 			// copy wrecks
-			wrecks.forEach(wreckModel ->
+			game.wrecks.forEach(wreckModel ->
 			{
 				Wreck wreck = new Wreck(wreckModel.x, wreckModel.y, wreckModel.water, wreckModel.radius);
 				wreck.id = wreckModel.id;
@@ -264,7 +267,6 @@ class Player
 				wrecks.add(wreck);
 				wreckIdToWreckMap.put(wreck.id, wreck);
 			});
-
 		}
 
 		private void copyUnit(Unit from, Unit to)
@@ -317,30 +319,34 @@ class Player
 		 * @param t0
 		 * @return
 		 */
-		public List<String> findBestAction(long t0)
+		public List<SavePoint.Action> findBestAction(long t0)
 		{
 			int nbSimu = 0;
 
-			while ((System.currentTimeMillis() - t0) < GAME_TIME_LIMIT)
+			while (true)
 			{
+				if ((System.currentTimeMillis() - t0) > GAME_TIME_LIMIT)
+				{
+					break;
+				}
+
 				try
 				{
+					// copy original game
 					Game game = new Game(this);
 
+					List<SavePoint.Action> actions = Arrays.asList(
+							actionMove(1770, -2422, 200), actionWait(), actionWait(),
+							actionWait(), actionWait(), actionWait(),
+							actionWait(), actionWait(), actionWait());
+
 					// save game state
-					handleActions(new String[]
-					{
-							"1770 -2422 200", "WAIT", "WAIT",
-							"WAIT", "WAIT", "WAIT",
-							"WAIT", "WAIT", "WAIT"
-					});
+					handleActions(actions);
 
 					// update game
 					updateGame(2);
 
 					nbSimu++;
-
-					// restore game state
 				}
 				catch (Exception e)
 				{
@@ -349,20 +355,17 @@ class Player
 			}
 
 			System.err.println("Nb simulations : " + nbSimu);
-			return Arrays.asList("1770 -2422 200", "WAIT", "WAIT");
+			return Arrays.asList(actionMove(1770, -2422, 200), actionWait(), actionWait());
 		}
 
-		private void handleActions(String[] outputs) throws Exception
+		public void handleActions(List<SavePoint.Action> actions) throws Exception
 		{
-			String[] outputs0 = new String[]
-			{ outputs[0], outputs[1], outputs[2] };
-			handlePlayerOutput(1, 1, 0, outputs0);
-			String[] outputs1 = new String[]
-			{ outputs[3], outputs[4], outputs[5] };
-			handlePlayerOutput(1, 1, 1, outputs1);
-			String[] outputs2 = new String[]
-			{ outputs[6], outputs[7], outputs[8] };
-			handlePlayerOutput(1, 1, 2, outputs2);
+			List<SavePoint.Action> actionsFor0 = Arrays.asList(actions.get(0), actions.get(1), actions.get(2));
+			handlePlayerOutput(0, actionsFor0);
+			List<SavePoint.Action> actionsFor1 = Arrays.asList(actions.get(3), actions.get(4), actions.get(5));
+			handlePlayerOutput(1, actionsFor1);
+			List<SavePoint.Action> actionsFor2 = Arrays.asList(actions.get(6), actions.get(7), actions.get(8));
+			handlePlayerOutput(2, actionsFor2);
 		}
 
 		protected void initEmpty()
@@ -758,89 +761,55 @@ class Player
 			}
 		}
 
-		protected void handlePlayerOutput(int frame, int round, int playerIdx, String[] outputs) throws Exception
+		protected void handlePlayerOutput(int playerIdx, List<SavePoint.Action> actions) throws Exception
 		{
 			InnerPlayer innerPlayer = innerPlayers.get(playerIdx);
-			String expected = "<x> <y> <power> | SKILL <x> <y> | WAIT";
 
 			for (int i = 0; i < LOOTER_COUNT; ++i)
 			{
-				String line = outputs[i];
-				Matcher match;
-				try
-				{
-					Looter looter = innerPlayers.get(playerIdx).looters[i];
+				Looter looter = innerPlayer.looters[i];
+				SavePoint.Action action = actions.get(i);
 
-					match = PLAYER_WAIT_PATTERN.matcher(line);
-					if (match.matches())
+				if (action.what.equals(Action.MOVE))
+				{
+					looter.attempt = Action.MOVE;
+					looter.setWantedThrust(new Point(action.x, action.y), action.extra);
+					continue;
+				}
+
+				if (action.what.equals(Action.WAIT))
+				{
+					looter.attempt = Action.WAIT;
+					continue;
+				}
+
+				if (action.what.equals(Action.SKILL))
+				{
+					if (!looter.skillActive)
 					{
+						// Don't kill the player for that. Just do a WAIT instead
 						looter.attempt = Action.WAIT;
-						matchMessage(looter, match);
 						continue;
 					}
 
-					match = PLAYER_MOVE_PATTERN.matcher(line);
-					if (match.matches())
+					looter.attempt = Action.SKILL;
+
+					SkillResult result = new SkillResult(action.x, action.y);
+					looter.skillResult = result;
+
+					try
 					{
-						looter.attempt = Action.MOVE;
-						int x = Integer.valueOf(match.group("x"));
-						int y = Integer.valueOf(match.group("y"));
-						int power = Integer.valueOf(match.group("power"));
-
-						looter.setWantedThrust(new Point(x, y), power);
-						matchMessage(looter, match);
-						continue;
+						SkillEffect effect = looter.skill(new Point(action.x, action.y));
+						skillEffects.add(effect);
 					}
-
-					match = PLAYER_SKILL_PATTERN.matcher(line);
-					if (match.matches())
+					catch (NoRageException e)
 					{
-						if (!looter.skillActive)
-						{
-							// Don't kill the player for that. Just do a WAIT instead
-							looter.attempt = Action.WAIT;
-							matchMessage(looter, match);
-							continue;
-						}
-
-						looter.attempt = Action.SKILL;
-						int x = Integer.valueOf(match.group("x"));
-						int y = Integer.valueOf(match.group("y"));
-
-						SkillResult result = new SkillResult(x, y);
-						looter.skillResult = result;
-
-						try
-						{
-							SkillEffect effect = looter.skill(new Point(x, y));
-							skillEffects.add(effect);
-						}
-						catch (NoRageException e)
-						{
-							result.code = SkillResult.NO_RAGE;
-						}
-						catch (TooFarException e)
-						{
-							result.code = SkillResult.TOO_FAR;
-						}
-						matchMessage(looter, match);
-						continue;
+						result.code = SkillResult.NO_RAGE;
 					}
-
-					throw new InvalidInputException(expected, line);
-				}
-				catch (InvalidInputException e)
-				{
-					innerPlayer.kill();
-					throw e;
-				}
-				catch (Exception e)
-				{
-					StringWriter errors = new StringWriter();
-					e.printStackTrace(new PrintWriter(errors));
-					System.err.println(e.getMessage() + "\n" + errors.toString());
-					innerPlayer.kill();
-					throw new InvalidInputException(expected, line);
+					catch (TooFarException e)
+					{
+						result.code = SkillResult.TOO_FAR;
+					}
 				}
 			}
 		}
