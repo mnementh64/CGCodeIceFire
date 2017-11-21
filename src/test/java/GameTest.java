@@ -278,6 +278,26 @@ public class GameTest
 		Assert.assertTrue(game.looterIdToLooterMap.get(0).vy == -678);
 	}
 
+	@Test
+	public void test_duplicate_game() throws Exception
+	{
+		// init game
+		String step1 = "0 0 0 0 0 0 6 " +
+				"0 0 0 0.5 400 -483 1533 0 0 -1 -1 " +
+				"1 0 1 0.5 400 -1086 -1184 0 0 -1 -1 " +
+				"2 0 2 0.5 400 1569 -349 0 0 -1 -1 " +
+				"3 4 -1 -1.0 850 2230 2007 0 0 9 -1 " +
+				"4 4 -1 -1.0 850 -2853 927 0 0 9 -1 " +
+				"5 4 -1 -1.0 850 624 -2934 0 0 9 -1";
+
+		Player.Game game = new Player.Game(0);
+		game.createFromInputLines(new Scanner(step1));
+
+		Player.Game duplicateGame = new Player.Game(game);
+
+//		Assert.assertTrue(game.looterIdToLooterMap.get(0).vy == -678);
+	}
+
 	private void handleActions(Player.Game game, String[] outputs) throws Exception
 	{
 		String[] outputs0 = new String[]

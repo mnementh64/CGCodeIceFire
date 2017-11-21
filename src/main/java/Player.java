@@ -23,7 +23,7 @@ import java.util.stream.Stream;
 class Player
 {
 
-	static boolean DEBUG = false;
+	static boolean DEBUG = true;
 	static Game game = new Game(0);
 	static int round = 1;
 
@@ -215,14 +215,96 @@ class Player
 			}
 
 			List<Action> actions;
-			List<Unit> units;
-			List<Looter> looters;
-			List<Tanker> tankers;
-			List<Wreck> wrecks;
-			List<List<? extends Unit>> unitsByType;
-			List<InnerPlayer> innerPlayers;
-			List<String> frameData;
-			Set<SkillEffect> skillEffects;
+			Game game;
+		}
+
+		public Game(Game game)
+		{
+			initEmpty();
+
+			// copy players
+			for (int playerIdx = 0; playerIdx < 3; playerIdx++)
+			{
+				InnerPlayer innerPlayerModel = game.innerPlayers.get(0);
+				InnerPlayer innerPlayer = new InnerPlayer(0, innerPlayerModel.score, innerPlayerModel.rage);
+				this.innerPlayers.add(innerPlayer);
+
+				// copy loopers
+				for (int looterIdx = 0; looterIdx < innerPlayerModel.looters.length; looterIdx++)
+				{
+					Looter looterModel = innerPlayerModel.looters[looterIdx];
+					Looter looter = copyLooter(looterModel, innerPlayer);
+
+					// add it to all involved collections
+					innerPlayer.looters[looter.type] = looter;
+					units.add(looter);
+					looters.add(looter);
+					looterIdToLooterMap.put(looter.id, looter);
+				}
+			}
+
+			// copy tankers
+			tankers.forEach(tankerModel ->
+			{
+				Tanker tanker = new Tanker(tankerModel.size, null);
+				copyUnit(tankerModel, tanker);
+				tanker.water = tankerModel.water;
+
+				tankers.add(tanker);
+				tankerIdToTankerMap.put(tanker.id, tanker);
+			});
+
+			// copy wrecks
+			wrecks.forEach(wreckModel ->
+			{
+				Wreck wreck = new Wreck(wreckModel.x, wreckModel.y, wreckModel.water, wreckModel.radius);
+				wreck.id = wreckModel.id;
+				wreck.known = wreckModel.known;
+
+				wrecks.add(wreck);
+				wreckIdToWreckMap.put(wreck.id, wreck);
+			});
+
+		}
+
+		private void copyUnit(Unit from, Unit to)
+		{
+			to.id = from.id;
+			to.vx = from.vx;
+			to.vy = from.vy;
+			to.radius = from.radius;
+			to.mass = from.mass;
+			to.friction = from.friction;
+			to.known = from.known;
+		}
+
+		private Looter copyLooter(Looter looterModel, InnerPlayer innerPlayer)
+		{
+			Looter looter = createLooter(looterModel.type, innerPlayer, looterModel.x, looterModel.y);
+			// Unit class
+			copyUnit(looterModel, looter);
+
+			// Looter class
+			looter.skillCost = looterModel.skillCost;
+			looter.skillRange = looterModel.skillRange;
+			looter.skillActive = looterModel.skillActive;
+
+			if (looterModel.wantedThrustTarget != null)
+			{
+				looter.wantedThrustTarget = new Point(looterModel.wantedThrustTarget.x, looterModel.wantedThrustTarget.y);
+				looter.wantedThrustPower = looterModel.wantedThrustPower;
+			}
+
+			looter.message = looterModel.message;
+			looter.attempt = looterModel.attempt;
+
+			if (looterModel.skillResult != null)
+			{
+				looter.skillResult = new SkillResult(looterModel.skillResult.getX(), looterModel.skillResult.getY());
+				looter.skillResult.code = looterModel.skillResult.code;
+			}
+
+			return looter;
 		}
 
 		/**
@@ -238,10 +320,13 @@ class Player
 		public List<String> findBestAction(long t0)
 		{
 			int nbSimu = 0;
+
 			while ((System.currentTimeMillis() - t0) < GAME_TIME_LIMIT)
 			{
 				try
 				{
+					Game game = new Game(this);
+
 					// save game state
 					handleActions(new String[]
 					{
@@ -280,7 +365,7 @@ class Player
 			handlePlayerOutput(1, 1, 2, outputs2);
 		}
 
-		protected void createFromInputLines(Scanner in)
+		protected void initEmpty()
 		{
 			units = new ArrayList<>();
 			looters = new ArrayList<>();
@@ -305,6 +390,11 @@ class Player
 
 				return a.id - b.id;
 			});
+		}
+
+		protected void createFromInputLines(Scanner in)
+		{
+			initEmpty();
 
 			int myScore = in.nextInt();
 			int enemyScore1 = in.nextInt();
