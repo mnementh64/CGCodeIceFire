@@ -76,7 +76,7 @@ public class GameTest
 	}
 
 	@Test
-	public void test_simulate_two_turns_only_position() throws Exception
+	public void test_calculate_two_turns_only_position() throws Exception
 	{
 		// init game
 		String step1 = "0 0 0 0 0 0 6 " +
@@ -114,7 +114,7 @@ public class GameTest
 	}
 
 	@Test
-	public void test_simulate_three_turns_only_position() throws Exception
+	public void test_calculate_three_turns_only_position() throws Exception
 	{
 		// init game
 		String step1 = "0 0 0 0 0 0 6 " +
@@ -172,7 +172,7 @@ public class GameTest
 	}
 
 	@Test
-	public void test_simulate_multiple_turns() throws Exception
+	public void test_calculate_multiple_turns() throws Exception
 	{
 		// init game
 		String step1 = "0 0 0 0 0 0 6 " +
@@ -222,6 +222,60 @@ public class GameTest
 		assertLooperPosition(game, 0, -2430, 4794);
 		assertLooperPosition(game, 1, 39, -3457);
 		assertLooperPosition(game, 2, 751, -2747);
+	}
+
+	@Test
+	public void test_simulate_three_turns_only_position() throws Exception
+	{
+		// init game
+		String step1 = "0 0 0 0 0 0 6 " +
+				"0 0 0 0.5 400 -483 1533 0 0 -1 -1 " +
+				"1 0 1 0.5 400 -1086 -1184 0 0 -1 -1 " +
+				"2 0 2 0.5 400 1569 -349 0 0 -1 -1 " +
+				"3 4 -1 -1.0 850 2230 2007 0 0 9 -1 " +
+				"4 4 -1 -1.0 850 -2853 927 0 0 9 -1 " +
+				"5 4 -1 -1.0 850 624 -2934 0 0 9 -1";
+		String step2 = "0 0 0 0 0 0 6 " +
+				"0 0 0 0.5 400 -285 1185 158 -278 -1 -1 " +
+				"1 0 1 0.5 400 -806 -1470 224 -229 -1 -1 " +
+				"2 0 2 0.5 400 1432 -725 -110 -301 -1 -1 " +
+				"3 4 -1 -1.0 850 2230 2007 0 0 9 -1 " +
+				"4 4 -1 -1.0 850 -2853 927 0 0 9 -1 " +
+				"5 4 -1 -1.0 850 624 -2934 0 0 9 -1";
+		String step3 = "0 0 0 0 0 0 6 " +
+				"0 0 0 0.5 400 71 559 285 -500 -1 -1 " +
+				"1 0 1 0.5 400 -302 -1985 403 -412 -1 -1 " +
+				"2 0 2 0.5 400 1185 -1402 -198 -541 -1 -1 " +
+				"3 4 -1 -1.0 850 2230 2007 0 0 9 -1 " +
+				"4 4 -1 -1.0 850 -2853 927 0 0 9 -1 " +
+				"5 4 -1 -1.0 850 624 -2934 0 0 9 -1";
+
+		Player.Game game = new Player.Game(0);
+		game.createFromInputLines(new Scanner(step1));
+		game.updateFromInputLines(new Scanner(step2));
+		game.updateFromInputLines(new Scanner(step3));
+
+		// simulate a move
+		handleActions(game, new String[]
+		{
+				"1770 -2422 200", "WAIT", "WAIT",
+				"WAIT", "WAIT", "WAIT",
+				"WAIT", "WAIT", "WAIT"
+		});
+
+		// update game
+		game.updateGame(2);
+
+//		0 1 1 0 0 0 6
+//		0 0 0 0.5 400 554 -289 386 -678 -1 -1
+//		1 0 1 0.5 400 245 -2764 39 -863 -1 -1
+//		2 0 2 0.5 400 985 -2238 239 -429 -1 -1
+//		3 4 -1 -1.0 850 2230 2007 0 0 9 -1
+//		4 4 -1 -1.0 850 -2853 927 0 0 9 -1
+//		5 4 -1 -1.0 850 624 -2934 0 0 7 -1
+		assertLooperPosition(game, 0, 554, -289);
+		Assert.assertTrue(game.looterIdToLooterMap.get(0).vx == 386);
+		Assert.assertTrue(game.looterIdToLooterMap.get(0).vy == -678);
 	}
 
 	private void handleActions(Player.Game game, String[] outputs) throws Exception

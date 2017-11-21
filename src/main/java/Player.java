@@ -1,6 +1,7 @@
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.stream.Stream;
 class Player
 {
 
+	static boolean DEBUG = false;
 	static Game game = new Game(0);
 	static int round = 1;
 
@@ -32,6 +34,7 @@ class Player
 		// game loop
 		while (true)
 		{
+			long t0 = System.currentTimeMillis();
 			if (round == 1)
 			{
 				game.createFromInputLines(in);
@@ -41,20 +44,23 @@ class Player
 				game.updateFromInputLines(in);
 			}
 
+			System.err.println("Init done in " + (System.currentTimeMillis() - t0) + "ms");
+			List<String> actions = game.findBestAction(t0);
+
 			// Write an action using System.out.println()
 			// To debug: System.err.println("Debug messages...");
 
-			System.out.println("WAIT");
-			System.out.println("WAIT");
-			System.out.println("WAIT");
+			actions.forEach(System.out::println);
 
 			round++;
+			System.err.println("Round done in " + (System.currentTimeMillis() - t0) + "ms");
 		}
 	}
 
 	static class Game
 	{
 
+		private static final long GAME_TIME_LIMIT = 50L;
 		private static int GAME_VERSION = 3;
 
 		static boolean SPAWN_WRECK = false;
@@ -188,6 +194,92 @@ class Player
 		Map<Integer, Tanker> tankerIdToTankerMap = new HashMap<>();
 		Map<Integer, Wreck> wreckIdToWreckMap = new HashMap<>();
 
+		static class SavePoint
+		{
+
+			static class Action
+			{
+
+				int x;
+				int y;
+				int what; // 1=WAIT, 2=MOVE, 3=SKILL
+
+				public static SavePoint.Action from(int x, int y, int what)
+				{
+					SavePoint.Action action = new Action();
+					action.x = x;
+					action.y = y;
+					action.what = what;
+					return action;
+				}
+			}
+
+			List<Action> actions;
+			List<Unit> units;
+			List<Looter> looters;
+			List<Tanker> tankers;
+			List<Wreck> wrecks;
+			List<List<? extends Unit>> unitsByType;
+			List<InnerPlayer> innerPlayers;
+			List<String> frameData;
+			Set<SkillEffect> skillEffects;
+		}
+
+		/**
+		 * Way of performance improvment :
+		 *
+		 * 	- do not us handleActions, but :
+		 * 		- set other players loopers' attempt to WAIT
+		 * 		- set my player loopers' attempts directly without a command line
+		 *
+		 * @param t0
+		 * @return
+		 */
+		public List<String> findBestAction(long t0)
+		{
+			int nbSimu = 0;
+			while ((System.currentTimeMillis() - t0) < GAME_TIME_LIMIT)
+			{
+				try
+				{
+					// save game state
+					handleActions(new String[]
+					{
+							"1770 -2422 200", "WAIT", "WAIT",
+							"WAIT", "WAIT", "WAIT",
+							"WAIT", "WAIT", "WAIT"
+					});
+
+					// update game
+					updateGame(2);
+
+					nbSimu++;
+
+					// restore game state
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+
+			System.err.println("Nb simulations : " + nbSimu);
+			return Arrays.asList("1770 -2422 200", "WAIT", "WAIT");
+		}
+
+		private void handleActions(String[] outputs) throws Exception
+		{
+			String[] outputs0 = new String[]
+			{ outputs[0], outputs[1], outputs[2] };
+			handlePlayerOutput(1, 1, 0, outputs0);
+			String[] outputs1 = new String[]
+			{ outputs[3], outputs[4], outputs[5] };
+			handlePlayerOutput(1, 1, 1, outputs1);
+			String[] outputs2 = new String[]
+			{ outputs[6], outputs[7], outputs[8] };
+			handlePlayerOutput(1, 1, 2, outputs2);
+		}
+
 		protected void createFromInputLines(Scanner in)
 		{
 			units = new ArrayList<>();
@@ -230,6 +322,10 @@ class Player
 			innerPlayers.add(innerPlayer);
 
 			int unitCount = in.nextInt();
+			if (Player.DEBUG)
+			{
+				System.err.println(myScore + " " + enemyScore1 + " " + enemyScore2 + " " + myRage + " " + enemyRage1 + " " + enemyRage2 + " " + unitCount);
+			}
 			for (int i = 0; i < unitCount; i++)
 			{
 				int unitId = in.nextInt();
@@ -267,6 +363,10 @@ class Player
 			innerPlayer.rage = enemyRage2;
 
 			int unitCount = in.nextInt();
+			if (Player.DEBUG)
+			{
+				System.err.println(myScore + " " + enemyScore1 + " " + enemyScore2 + " " + myRage + " " + enemyRage1 + " " + enemyRage2 + " " + unitCount);
+			}
 			for (int i = 0; i < unitCount; i++)
 			{
 				int unitId = in.nextInt();
@@ -287,11 +387,18 @@ class Player
 			int vy = in.nextInt();
 			int extra = in.nextInt();
 			int extra2 = in.nextInt();
-
-			InnerPlayer player = playerIndex >= 0 ? innerPlayers.get(playerIndex) : null;
+			if (Player.DEBUG)
+			{
+				String row =
+						unitId + " " + unitType + " " + playerIndex + " " + mass + " " + radius + " " + x + " " + y + " " + vx + " " + vy + " " + extra + " "
+								+ extra2;
+				System.err.println(row);
+			}
 
 			if (unitType < LOOTER_COUNT)
 			{
+				InnerPlayer player = playerIndex >= 0 ? innerPlayers.get(playerIndex) : null;
+
 				// get / create looter
 				Looter looter = looterIdToLooterMap.get(unitId);
 				if (looter == null)
@@ -317,6 +424,8 @@ class Player
 			}
 			else if (unitType == TYPE_TANKER)
 			{
+				InnerPlayer player = playerIndex >= 0 ? innerPlayers.get(playerIndex) : null;
+
 				// get / create tanker
 				Tanker tanker = tankerIdToTankerMap.get(unitId);
 				if (tanker == null)
@@ -378,7 +487,7 @@ class Player
 
 			double t = 0.0;
 
-			// Play the round. Stop at each collisions and play it. Reapeat until t > 1.0
+			// Play the round. Stop at each collisions and play it. Repeat until t > 1.0
 
 			Collision collision = getNextCollision();
 
@@ -424,27 +533,14 @@ class Player
 
 			if (!tankersToRemove.isEmpty())
 			{
-				tankersToRemove.forEach(tanker -> addDeadToFrame(tanker));
+				tankersToRemove.forEach(this::addDeadToFrame);
 			}
 
 			units.removeAll(tankersToRemove);
 			tankers.removeAll(tankersToRemove);
 
-			Set<Wreck> deadWrecks = new HashSet<>();
-
 			// Water collection for reapers
-			wrecks = wrecks.stream().filter(w ->
-			{
-				boolean alive = w.harvest(innerPlayers, skillEffects);
-
-				if (!alive)
-				{
-					addDeadToFrame(w);
-					deadWrecks.add(w);
-				}
-
-				return alive;
-			}).collect(Collectors.toList());
+			wrecks = wrecks.stream().filter(w -> w.harvest(innerPlayers, skillEffects)).collect(Collectors.toList());
 
 			// Round values and apply friction
 			adjust();
@@ -707,11 +803,11 @@ class Player
 		{
 			unitsByType.forEach(list ->
 			{
-				frameData.addAll(list.stream().map(u -> u.toFrameData()).collect(Collectors.toList()));
+				frameData.addAll(list.stream().map(Unit::toFrameData).collect(Collectors.toList()));
 			});
 
-			frameData.addAll(wrecks.stream().map(w -> w.toFrameData()).collect(Collectors.toList()));
-			frameData.addAll(skillEffects.stream().map(s -> s.toFrameData()).collect(Collectors.toList()));
+			frameData.addAll(wrecks.stream().map(Wreck::toFrameData).collect(Collectors.toList()));
+			frameData.addAll(skillEffects.stream().map(SkillEffect::toFrameData).collect(Collectors.toList()));
 		}
 
 		static public int round(double x)
@@ -828,14 +924,18 @@ class Player
 			@Override
 			public int hashCode()
 			{
-				final int prime = 31;
-				int result = 1;
-				long temp;
-				temp = Double.doubleToLongBits(x);
-				result = prime * result + (int) (temp ^ (temp >>> 32));
-				temp = Double.doubleToLongBits(y);
-				result = prime * result + (int) (temp ^ (temp >>> 32));
-				return result;
+				// copied from java.awt.Point2D
+				long bits = java.lang.Double.doubleToLongBits(x);
+				bits ^= java.lang.Double.doubleToLongBits(y) * 31;
+				return (((int) bits) ^ ((int) (bits >> 32)));
+//				final int prime = 31;
+//				int result = 1;
+//				long temp;
+//				temp = Double.doubleToLongBits(x);
+//				result = prime * result + (int) (temp ^ (temp >>> 32));
+//				temp = Double.doubleToLongBits(y);
+//				result = prime * result + (int) (temp ^ (temp >>> 32));
+//				return result;
 			}
 
 			@Override
@@ -848,11 +948,20 @@ class Player
 				if (getClass() != obj.getClass())
 					return false;
 				Point other = (Point) obj;
-				if (Double.doubleToLongBits(x) != Double.doubleToLongBits(other.x))
-					return false;
-				if (Double.doubleToLongBits(y) != Double.doubleToLongBits(other.y))
-					return false;
-				return true;
+				return (x == other.x) && (y == other.y);
+
+//				if (this == obj)
+//					return true;
+//				if (obj == null)
+//					return false;
+//				if (getClass() != obj.getClass())
+//					return false;
+//				Point other = (Point) obj;
+//				if (Double.doubleToLongBits(x) != Double.doubleToLongBits(other.x))
+//					return false;
+//				if (Double.doubleToLongBits(y) != Double.doubleToLongBits(other.y))
+//					return false;
+//				return true;
 			}
 		}
 
