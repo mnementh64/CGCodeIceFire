@@ -285,12 +285,34 @@ public class GameTest
 		Player.Game duplicateGame = new Player.Game(game);
 
 		Assert.assertTrue(duplicateGame.innerPlayers.get(0).looters.length == game.innerPlayers.get(0).looters.length);
-		Assert.assertTrue(duplicateGame.looters.get(0).x == game.looters.get(0).x);
-		Assert.assertTrue(duplicateGame.looters.get(0).y == game.looters.get(0).y);
-		Assert.assertTrue(duplicateGame.looters.get(0).vx == game.looters.get(0).vx);
-		Assert.assertTrue(duplicateGame.looters.get(0).vy == game.looters.get(0).vy);
+		for (int i=0;i<3;i++)
+		{
+			Assert.assertTrue(duplicateGame.looters.get(i).x == game.looters.get(i).x);
+			Assert.assertTrue(duplicateGame.looters.get(i).y == game.looters.get(i).y);
+			Assert.assertTrue(duplicateGame.looters.get(i).vx == game.looters.get(i).vx);
+			Assert.assertTrue(duplicateGame.looters.get(i).vy == game.looters.get(i).vy);
+		}
 		Assert.assertTrue(duplicateGame.wrecks.get(0).x == game.wrecks.get(0).x);
 		Assert.assertTrue(duplicateGame.wrecks.get(0).y == game.wrecks.get(0).y);
+	}
+
+	@Test
+	public void test_run() throws Exception
+	{
+		// init game
+		String step1 = "0 0 0 0 0 0 6 " +
+				"0 0 0 0.5 400 -483 1533 0 0 -1 -1 " +
+				"1 0 1 0.5 400 -1086 -1184 0 0 -1 -1 " +
+				"2 0 2 0.5 400 1569 -349 0 0 -1 -1 " +
+				"3 4 -1 -1.0 850 2230 2007 0 0 9 -1 " +
+				"4 4 -1 -1.0 850 -2853 927 0 0 9 -1 " +
+				"5 4 -1 -1.0 850 624 -2934 0 0 9 -1";
+
+		Player.Game game = new Player.Game(0);
+		game.createFromInputLines(new Scanner(step1));
+		game.findBestAction(System.currentTimeMillis(), 100);
+
+		Player.applyBestSolution();
 	}
 
 	private void assertLooperPosition(Player.Game game, int playerIndex, int x, int y)

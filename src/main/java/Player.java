@@ -1,15 +1,16 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -17,8 +18,12 @@ class Player
 {
 
 	static boolean DEBUG = false;
+	private static final long GAME_TIME_LIMIT_FIRST = 960;
+	private static final long GAME_TIME_LIMIT = 40;
+
 	static Game game = new Game(0);
 	static int round = 1;
+	static TreeSet<Game.Solution> bestSolutions = new TreeSet<>(Comparator.comparingInt(s -> s.value));
 
 	public static void main(String args[])
 	{
@@ -37,23 +42,33 @@ class Player
 				game.updateFromInputLines(in);
 			}
 
-			System.err.println("Init done in " + (System.currentTimeMillis() - t0) + "ms");
-			List<Game.SavePoint.Action> actions = game.findBestAction(t0);
+			if (DEBUG) System.err.println("Init done in " + (System.currentTimeMillis() - t0) + "ms");
+			game.findBestAction(t0, round == 1 ? GAME_TIME_LIMIT_FIRST : GAME_TIME_LIMIT);
 
 			// Write an action using System.out.println()
 			// To debug: System.err.println("Debug messages...");
 
-			actions.stream().map(Game.SavePoint.Action::toString).forEach(System.out::println);
+			// pick up actions for next round for best solution
+			applyBestSolution();
+//			actions.stream().map(Game.Action::toString).forEach(System.out::println);
 
 			round++;
-			System.err.println("Round done in " + (System.currentTimeMillis() - t0) + "ms");
+			if (DEBUG) System.err.println("Round done in " + (System.currentTimeMillis() - t0) + "ms");
 		}
+
+	}
+
+	static void applyBestSolution()
+	{
+		Game.Solution bestSolution = bestSolutions.iterator().next();
+		List<Game.Action> bestActions = bestSolution.actions.get(0).actions;
+		if (DEBUG) System.err.println("Solution : score=" + bestSolution.value);
+		bestActions.stream().limit(3).map(Game.Action::toString).forEach(System.out::println);
 	}
 
 	static class Game
 	{
 
-		private static final long GAME_TIME_LIMIT = 40;
 		private static int GAME_VERSION = 3;
 
 		static boolean SPAWN_WRECK = false;
@@ -174,51 +189,213 @@ class Player
 		List<Wreck> wrecks;
 		List<List<? extends Unit>> unitsByType;
 		List<InnerPlayer> innerPlayers;
-		List<String> frameData;
 		Set<SkillEffect> skillEffects;
 
 		Map<Integer, Looter> looterIdToLooterMap = new HashMap<>();
 		Map<Integer, Tanker> tankerIdToTankerMap = new HashMap<>();
 		Map<Integer, Wreck> wreckIdToWreckMap = new HashMap<>();
 
-		static class SavePoint
+		Random randomAction = new Random(System.currentTimeMillis());
+
+		public void findBestAction(long t0, long timeLimit)
 		{
+			int nbSimu = 0;
+			bestSolutions.clear();
 
-			static class Action
+			final Looter myReaper = looters.get(0);
+			Wreck target = null;
+			double distanceMin = Double.MAX_VALUE;
+			for (Wreck wreck : wrecks)
 			{
-
-				int x;
-				int y;
-				int extra;
-				Game.Action what;
-
-				@Override
-				public String toString()
+				if (wreck.water <= 0)
 				{
-					return what.equals(Game.Action.MOVE) ? x + " " + y + " " + extra : what.equals(Game.Action.WAIT) ? "WAIT" : "SKILL !";
+					continue;
+				}
+				double distance = wreck.distance(myReaper);
+				if (distance < distanceMin)
+				{
+					distanceMin = distance;
+					target = wreck;
 				}
 			}
 
-			List<Action> actions;
-			Game game;
+			RoundAction rAction = new RoundAction();
+
+			if (target != null)
+			{
+				int power = distanceMin <= 300 ? (int) (distanceMin / 10) : 300;
+				if (DEBUG) System.err.println("Target wreck " + target.id + " with water " + target.water + " (power : " + power + ")");
+				rAction.actions = Arrays.asList(Player.Game.actionMove(new Double(target.x).intValue(), new Double(target.y).intValue(), power),
+						Player.Game.actionWait(), Player.Game.actionWait());
+			}
+			else
+			{
+				rAction.actions = Arrays.asList(Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait());
+			}
+			Solution sol = new Solution();
+			sol.actions = Collections.singletonList(rAction);
+			sol.value = 1;
+			Player.bestSolutions.add(sol);
+			if (1 == 1)
+				return;
+
+			while (true)
+			{
+				if ((System.currentTimeMillis() - t0) > timeLimit)
+				{
+					System.err.println("Nb simulations (1) : " + nbSimu);
+					return;
+				}
+
+				try
+				{
+					// pick up 1000 random actions on N rounds depth
+					List<RoundAction> roundActions = fullActionRandom(randomAction, 3 - LOOTER_COUNT, 10);
+
+					// copy original game
+					Game game = new Game(this);
+					Solution solution = new Solution();
+					solution.actions = roundActions;
+					Player.bestSolutions.add(solution);
+					for (RoundAction roundAction : roundActions)
+					{
+						game.evolve(roundAction);
+						solution.value = game.evaluate();
+
+						if ((System.currentTimeMillis() - t0) > timeLimit)
+						{
+							System.err.println("Nb simulations (2) : " + nbSimu);
+							return;
+						}
+					}
+					nbSimu++;
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+
+		private void evolve(RoundAction roundAction) throws Exception
+		{
+			handleActions(roundAction.actions);
+			updateGame(0);
+		}
+
+		static class Solution
+		{
+
+			List<RoundAction> actions; // one round action per round
 			int value;
 		}
 
-		public static SavePoint.Action actionWait()
+		static class RoundAction
 		{
-			SavePoint.Action action = new SavePoint.Action();
-			action.what = Action.WAIT;
+
+			List<Action> actions; // one action per looper
+
+		}
+
+		static class Action
+		{
+
+			int x;
+			int y;
+			int extra;
+			ActionType what;
+
+			@Override
+			public String toString()
+			{
+				return what.equals(ActionType.MOVE) ? x + " " + y + " " + extra : what.equals(ActionType.WAIT) ? "WAIT" : "SKILL " + x + " " + y;
+			}
+		}
+
+		public static Action actionWait()
+		{
+			Action action = new Action();
+			action.what = ActionType.WAIT;
 			return action;
 		}
 
-		public static SavePoint.Action actionMove(int x, int y, int thrust)
+		public static Action actionMove(int x, int y, int power)
 		{
-			SavePoint.Action action = new SavePoint.Action();
-			action.what = Action.MOVE;
+			Action action = new Action();
+			action.what = ActionType.MOVE;
 			action.x = x;
 			action.y = y;
-			action.extra = thrust;
+			action.extra = power;
 			return action;
+		}
+
+		public static Action actionSkill(int x, int y)
+		{
+			Action action = new Action();
+			action.what = ActionType.SKILL;
+			action.x = x;
+			action.y = y;
+			return action;
+		}
+
+		public List<RoundAction> fullActionRandom(Random random, int nbForceWait, int depth)
+		{
+			List<RoundAction> actions = new ArrayList<>();
+//			for (int i = 0; i < depth; i++)
+//			{
+//				RoundAction roundAction = new RoundAction();
+//				roundAction.actions = roundActionRandom(random, nbForceWait);
+//				actions.add(roundAction);
+//			}
+
+			RoundAction roundAction = new RoundAction();
+			roundAction.actions = roundActionRandom(random, nbForceWait);
+			for (int i = 0; i < depth; i++)
+			{
+				actions.add(roundAction);
+			}
+
+			return actions;
+		}
+
+		public List<Action> roundActionRandom(Random random, int nbForceWait)
+		{
+			List<Action> actions = new ArrayList<>();
+
+			for (int i = 0; i < 3 - nbForceWait; i++)
+			{
+				// random type
+				int type = random.nextInt(100);
+				if (type >= 0 && type <= 100)
+				{
+					Wreck wreck = wrecks.get(random.nextInt(wrecks.size()));
+					actions.add(actionMove((int) Math.round(wreck.x), (int) Math.round(wreck.y), 300));
+//					actions.add(actionMove(random.nextInt(6000) - 3000, random.nextInt(6000) - 3000, random.nextInt(300)));
+				}
+				else if (type > 75 && type <= 90)
+					actions.add(actionWait());
+				else
+					// TODO : implement skills
+					actions.add(actionWait());
+			}
+			for (int i = 3 - nbForceWait; i < 3; i++)
+			{
+				actions.add(actionWait());
+			}
+
+			// for opponent
+			for (int i = 1; i < 7; i++)
+			{
+				actions.add(actionWait());
+			}
+
+			return actions;
+		}
+
+		public int evaluate()
+		{
+			// simpliest eval function
+			return innerPlayers.get(0).score;
 		}
 
 		public Game(Game game)
@@ -228,8 +405,8 @@ class Player
 			// copy players
 			for (int playerIdx = 0; playerIdx < 3; playerIdx++)
 			{
-				InnerPlayer innerPlayerModel = game.innerPlayers.get(0);
-				InnerPlayer innerPlayer = new InnerPlayer(0, innerPlayerModel.score, innerPlayerModel.rage);
+				InnerPlayer innerPlayerModel = game.innerPlayers.get(playerIdx);
+				InnerPlayer innerPlayer = new InnerPlayer(playerIdx, innerPlayerModel.score, innerPlayerModel.rage);
 				this.innerPlayers.add(innerPlayer);
 
 				// copy loopers
@@ -309,62 +486,13 @@ class Player
 			return looter;
 		}
 
-		/**
-		 * Way of performance improvment :
-		 *
-		 * 	- do not us handleActions, but :
-		 * 		- set other players loopers' attempt to WAIT
-		 * 		- set my player loopers' attempts directly without a command line
-		 *
-		 * @param t0
-		 * @return
-		 */
-		public List<SavePoint.Action> findBestAction(long t0)
+		public void handleActions(List<Action> actions) throws Exception
 		{
-			int nbSimu = 0;
-
-			while (true)
-			{
-				if ((System.currentTimeMillis() - t0) > GAME_TIME_LIMIT)
-				{
-					break;
-				}
-
-				try
-				{
-					// copy original game
-					Game game = new Game(this);
-
-					List<SavePoint.Action> actions = Arrays.asList(
-							actionMove(1770, -2422, 200), actionWait(), actionWait(),
-							actionWait(), actionWait(), actionWait(),
-							actionWait(), actionWait(), actionWait());
-
-					// save game state
-					handleActions(actions);
-
-					// update game
-					updateGame(2);
-
-					nbSimu++;
-				}
-				catch (Exception e)
-				{
-					e.printStackTrace();
-				}
-			}
-
-			System.err.println("Nb simulations : " + nbSimu);
-			return Arrays.asList(actionMove(1770, -2422, 200), actionWait(), actionWait());
-		}
-
-		public void handleActions(List<SavePoint.Action> actions) throws Exception
-		{
-			List<SavePoint.Action> actionsFor0 = Arrays.asList(actions.get(0), actions.get(1), actions.get(2));
+			List<Action> actionsFor0 = Arrays.asList(actions.get(0), actions.get(1), actions.get(2));
 			handlePlayerOutput(0, actionsFor0);
-			List<SavePoint.Action> actionsFor1 = Arrays.asList(actions.get(3), actions.get(4), actions.get(5));
+			List<Action> actionsFor1 = Arrays.asList(actions.get(3), actions.get(4), actions.get(5));
 			handlePlayerOutput(1, actionsFor1);
-			List<SavePoint.Action> actionsFor2 = Arrays.asList(actions.get(6), actions.get(7), actions.get(8));
+			List<Action> actionsFor2 = Arrays.asList(actions.get(6), actions.get(7), actions.get(8));
 			handlePlayerOutput(2, actionsFor2);
 		}
 
@@ -379,8 +507,6 @@ class Player
 			unitsByType = new ArrayList<>();
 			unitsByType.add(looters);
 			unitsByType.add(tankers);
-
-			frameData = new ArrayList<>();
 
 			skillEffects = new TreeSet<>((a, b) ->
 			{
@@ -429,8 +555,6 @@ class Player
 			}
 
 			adjust();
-			newFrame(1.0);
-			snapshot();
 		}
 
 		protected void updateFromInputLines(Scanner in)
@@ -460,6 +584,9 @@ class Player
 			{
 				System.err.println(myScore + " " + enemyScore1 + " " + enemyScore2 + " " + myRage + " " + enemyRage1 + " " + enemyRage2 + " " + unitCount);
 			}
+
+			Set<Integer> expectedWreckIds = new HashSet<>();
+			Set<Integer> expectedTankersIds = new HashSet<>();
 			for (int i = 0; i < unitCount; i++)
 			{
 				int unitId = in.nextInt();
@@ -467,7 +594,20 @@ class Player
 				int player = in.nextInt();
 
 				createOrUpdateUnit(unitId, unitType, player, in);
+
+				if (unitType == TYPE_TANKER)
+				{
+					expectedTankersIds.add(unitId);
+				}
+				else if (unitType == TYPE_WRECK)
+				{
+					expectedWreckIds.add(unitId);
+				}
 			}
+
+			// remove unexpected tankers and wrecks
+			wrecks.removeIf(wreck -> !expectedWreckIds.contains(wreck.id));
+			tankers.removeIf(tanker -> !expectedTankersIds.contains(tanker.id));
 		}
 
 		private void createOrUpdateUnit(int unitId, int unitType, int playerIndex, Scanner in)
@@ -590,8 +730,6 @@ class Player
 				units.forEach(u -> u.move(delta));
 				t += collision.t;
 
-				newFrame(t);
-
 				playCollision(collision);
 
 				collision = getNextCollision();
@@ -620,14 +758,6 @@ class Player
 					tankersToRemove.add(tanker);
 				}
 			});
-
-			newFrame(1.0);
-			snapshot();
-
-			if (!tankersToRemove.isEmpty())
-			{
-				tankersToRemove.forEach(this::addDeadToFrame);
-			}
 
 			units.removeAll(tankersToRemove);
 			tankers.removeAll(tankersToRemove);
@@ -659,7 +789,6 @@ class Player
 			{
 				if (effect.duration <= 0)
 				{
-					addDeadToFrame(effect);
 					effectsToRemove.add(effect);
 				}
 			}
@@ -728,7 +857,6 @@ class Player
 			if (collision.b == null)
 			{
 				// Bounce with border
-				addToFrame(collision.a);
 				collision.a.bounce();
 			}
 			else
@@ -738,7 +866,6 @@ class Player
 				if (dead != null)
 				{
 					// A destroyer kill a tanker
-					addDeadToFrame(dead);
 					tankers.remove(dead);
 					units.remove(dead);
 
@@ -748,51 +875,48 @@ class Player
 					if (wreck != null)
 					{
 						wrecks.add(wreck);
-						addToFrame(wreck);
 					}
 				}
 				else
 				{
 					// Bounce between two units
-					addToFrame(collision.a);
-					addToFrame(collision.b);
 					collision.a.bounce(collision.b);
 				}
 			}
 		}
 
-		protected void handlePlayerOutput(int playerIdx, List<SavePoint.Action> actions) throws Exception
+		protected void handlePlayerOutput(int playerIdx, List<Action> actions) throws Exception
 		{
 			InnerPlayer innerPlayer = innerPlayers.get(playerIdx);
 
 			for (int i = 0; i < LOOTER_COUNT; ++i)
 			{
 				Looter looter = innerPlayer.looters[i];
-				SavePoint.Action action = actions.get(i);
+				Action action = actions.get(i);
 
-				if (action.what.equals(Action.MOVE))
+				if (action.what.equals(ActionType.MOVE))
 				{
-					looter.attempt = Action.MOVE;
+					looter.attempt = ActionType.MOVE;
 					looter.setWantedThrust(new Point(action.x, action.y), action.extra);
 					continue;
 				}
 
-				if (action.what.equals(Action.WAIT))
+				if (action.what.equals(ActionType.WAIT))
 				{
-					looter.attempt = Action.WAIT;
+					looter.attempt = ActionType.WAIT;
 					continue;
 				}
 
-				if (action.what.equals(Action.SKILL))
+				if (action.what.equals(ActionType.SKILL))
 				{
 					if (!looter.skillActive)
 					{
 						// Don't kill the player for that. Just do a WAIT instead
-						looter.attempt = Action.WAIT;
+						looter.attempt = ActionType.WAIT;
 						continue;
 					}
 
-					looter.attempt = Action.SKILL;
+					looter.attempt = ActionType.SKILL;
 
 					SkillResult result = new SkillResult(action.x, action.y);
 					looter.skillResult = result;
@@ -812,61 +936,6 @@ class Player
 					}
 				}
 			}
-		}
-
-		private void matchMessage(Looter looter, Matcher match)
-		{
-			looter.message = match.group("message");
-			if (looter.message != null && looter.message.length() > 19)
-			{
-				looter.message = looter.message.substring(0, 17) + "...";
-			}
-		}
-
-		void newFrame(double t)
-		{
-			frameData.add("#" + String.format(Locale.US, "%.5f", t));
-		}
-
-		void addToFrame(Wreck w)
-		{
-			frameData.add(w.toFrameData());
-		}
-
-		void addToFrame(Unit u)
-		{
-			frameData.add(u.toFrameData());
-		}
-
-		void addToFrame(SkillEffect s)
-		{
-			frameData.add(s.toFrameData());
-		}
-
-		void addDeadToFrame(SkillEffect s)
-		{
-			frameData.add(join(s.toFrameData(), "d"));
-		}
-
-		void addDeadToFrame(Unit u)
-		{
-			frameData.add(join(u.toFrameData(), "d"));
-		}
-
-		void addDeadToFrame(Wreck w)
-		{
-			frameData.add(join(w.toFrameData(), "d"));
-		}
-
-		void snapshot()
-		{
-			unitsByType.forEach(list ->
-			{
-				frameData.addAll(list.stream().map(Unit::toFrameData).collect(Collectors.toList()));
-			});
-
-			frameData.addAll(wrecks.stream().map(Wreck::toFrameData).collect(Collectors.toList()));
-			frameData.addAll(skillEffects.stream().map(SkillEffect::toFrameData).collect(Collectors.toList()));
 		}
 
 		static public int round(double x)
@@ -902,7 +971,7 @@ class Player
 		{
 		}
 
-		enum Action
+		enum ActionType
 		{
 			SKILL, MOVE, WAIT;
 		}
@@ -1043,23 +1112,6 @@ class Player
 				this.water = water;
 			}
 
-			String getFrameId()
-			{
-				return id + "@" + water;
-			}
-
-			String toFrameData()
-			{
-				if (known)
-				{
-					return String.valueOf(getFrameId());
-				}
-
-				known = true;
-
-				return join(getFrameId(), Math.round(x), Math.round(y), 0, 0, TYPE_WRECK, radius);
-			}
-
 			// Reaper harvesting
 			public boolean harvest(List<InnerPlayer> innerPlayers, Set<SkillEffect> skillEffects)
 			{
@@ -1134,23 +1186,6 @@ class Player
 				if (id != other.id)
 					return false;
 				return true;
-			}
-
-			String getFrameId()
-			{
-				return String.valueOf(id);
-			}
-
-			String toFrameData()
-			{
-				if (known)
-				{
-					return join(getFrameId(), Math.round(x), Math.round(y), Math.round(vx), Math.round(vy));
-				}
-
-				known = true;
-
-				return join(getFrameId(), Math.round(x), Math.round(y), Math.round(vx), Math.round(vy), type, Math.round(radius));
 			}
 
 			void thrust(Point p, int power)
@@ -1480,7 +1515,7 @@ class Player
 			int wantedThrustPower;
 
 			String message;
-			Action attempt;
+			ActionType attempt;
 			SkillResult skillResult;
 
 			Looter(int type, InnerPlayer innerPlayer, double x, double y)
@@ -1501,16 +1536,6 @@ class Player
 
 				innerPlayer.rage -= skillCost;
 				return skillImpl(p);
-			}
-
-			String toFrameData()
-			{
-				if (known)
-				{
-					return super.toFrameData();
-				}
-
-				return join(super.toFrameData(), innerPlayer.index);
 			}
 
 			public int getPlayerIndex()
@@ -1735,18 +1760,6 @@ class Player
 			{
 				duration -= 1;
 				applyImpl(units.stream().filter(u -> isInRange(u, radius + u.radius)).collect(Collectors.toList()));
-			}
-
-			String toFrameData()
-			{
-				if (known)
-				{
-					return String.valueOf(id);
-				}
-
-				known = true;
-
-				return join(id, Math.round(x), Math.round(y), looter.id, 0, type, Math.round(radius));
 			}
 
 			abstract void applyImpl(List<Unit> units);
