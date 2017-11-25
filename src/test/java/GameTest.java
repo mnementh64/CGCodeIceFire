@@ -1,4 +1,3 @@
-import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -241,10 +240,11 @@ public class GameTest
 //		1044 -3404 300
 //		4484 7572 300
 //		1044 -3404 300
-		game.handleActions(Arrays.asList(
+		game.handleActions(new Player.Game.Action[]
+		{
 				Player.Game.actionMove(1044, -3404, 300), Player.Game.actionMove(4484, 7572, 300), Player.Game.actionMove(1044, -3404, 300),
 				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
-				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait()));
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait() });
 
 		// update game
 		game.updateGame(2);
@@ -275,10 +275,11 @@ public class GameTest
 //		985 -3213 300
 //		4195 7085 300
 //		985 -3213 300
-		game.handleActions(Arrays.asList(
+		game.handleActions(new Player.Game.Action[]
+		{
 				Player.Game.actionMove(985, -3213, 300), Player.Game.actionMove(4195, 7085, 300), Player.Game.actionMove(985, -3213, 300),
 				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait(),
-				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait()));
+				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionWait() });
 
 		// update game
 		game.updateGame(2);
@@ -515,10 +516,11 @@ public class GameTest
 //		-3123 3988 250
 //		1528 4473 200
 
-		game.handleActions(Arrays.asList(
+		game.handleActions(new Player.Game.Action[]
+		{
 				Player.Game.actionMove(4423, 1021, 300), Player.Game.actionMove(2385, 2319, 300), Player.Game.actionMove(-776, 3605, 300),
 				Player.Game.actionWait(), Player.Game.actionWait(), Player.Game.actionMove(-4918, 2328, 200),
-				Player.Game.actionMove(-1584, 2248, 250), Player.Game.actionMove(-3123, 3988, 250), Player.Game.actionMove(1528, 4473, 200)));
+				Player.Game.actionMove(-1584, 2248, 250), Player.Game.actionMove(-3123, 3988, 250), Player.Game.actionMove(1528, 4473, 200) });
 
 		// update game
 		game.updateGame(2);
@@ -696,7 +698,7 @@ public class GameTest
 				"136 4 -1 -1.0 700 -884 -3021 0 0 1 -1";
 		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
 		game.createFromInputLines(new Scanner(raw));
-		game.findBestAction(System.currentTimeMillis(), 100);
+		game.findBestAction(System.currentTimeMillis(), 50);
 
 		Player.applyBestSolution();
 	}
@@ -735,28 +737,28 @@ public class GameTest
 		System.out.println("Reaper at " + game.looters.get(0).x + ", " + game.looters.get(0).y);
 	}
 
-	@Test
-	public void test_listPossibleActionsForReaper() throws Exception
-	{
-		String raw = "0 0 0 0 0 0 12 " +
-				"0 0 0 0.5 400 -1168 3138 0 0 -1 -1 " +
-				"1 1 0 1.5 400 1366 2658 0 0 -1 -1 " +
-				"2 2 0 1.0 400 2978 1517 0 0 -1 -1 " +
-				"3 0 1 0.5 400 -2133 -2581 0 0 -1 -1 " +
-				"4 1 1 1.5 400 -2985 -146 0 0 -1 -1 " +
-				"5 2 1 1.0 400 -2803 1821 0 0 -1 -1 " +
-				"6 0 2 0.5 400 3301 -557 0 0 -1 -1 " +
-				"7 1 2 1.5 400 1619 -2512 0 0 -1 -1 " +
-				"8 2 2 1.0 400 -176 -3338 0 0 -1 -1 " +
-				"9 3 -1 3.0 600 8581 569 -399 -26 1 4 " +
-				"10 3 -1 3.0 600 -4783 7147 222 -332 1 4 " +
-				"11 3 -1 3.0 600 -3798 -7716 177 359 1 4";
-		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
-		game.createFromInputLines(new Scanner(raw));
-
-		List<Player.Game.Action> actions = game.listPossibleActionsForReaper();
-
-	}
+//	@Test
+//	public void test_listPossibleActionsForReaper() throws Exception
+//	{
+//		String raw = "0 0 0 0 0 0 12 " +
+//				"0 0 0 0.5 400 -1168 3138 0 0 -1 -1 " +
+//				"1 1 0 1.5 400 1366 2658 0 0 -1 -1 " +
+//				"2 2 0 1.0 400 2978 1517 0 0 -1 -1 " +
+//				"3 0 1 0.5 400 -2133 -2581 0 0 -1 -1 " +
+//				"4 1 1 1.5 400 -2985 -146 0 0 -1 -1 " +
+//				"5 2 1 1.0 400 -2803 1821 0 0 -1 -1 " +
+//				"6 0 2 0.5 400 3301 -557 0 0 -1 -1 " +
+//				"7 1 2 1.5 400 1619 -2512 0 0 -1 -1 " +
+//				"8 2 2 1.0 400 -176 -3338 0 0 -1 -1 " +
+//				"9 3 -1 3.0 600 8581 569 -399 -26 1 4 " +
+//				"10 3 -1 3.0 600 -4783 7147 222 -332 1 4 " +
+//				"11 3 -1 3.0 600 -3798 -7716 177 359 1 4";
+//		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
+//		game.createFromInputLines(new Scanner(raw));
+//
+//		List<Player.Game.Action> actions = game.listPossibleActionsForReaper();
+//
+//	}
 
 	private void assertLooperPosition(Player.Game game, int looterIndex, int x, int y)
 	{

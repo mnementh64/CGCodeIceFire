@@ -1,6 +1,5 @@
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -11,12 +10,12 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 class Player
 {
 
 	static boolean DEBUG = false;
+	static boolean DEBUG_SOLUTION = true;
 	static boolean DEBUG_INPUT = false;
 	private static final long GAME_TIME_LIMIT_FIRST = 960;
 	private static final long GAME_TIME_LIMIT = 40;
@@ -24,6 +23,9 @@ class Player
 	public static final int CURRENT_VERSION = 3;
 	static Game game = new Game(CURRENT_VERSION);
 	static int round = 1;
+	static int nbSolutionsBySimulation = 0;
+	static int nbRoundsWithAllSolutionsTested = 0;
+
 	static List<Game.Action> bestActions = null;
 
 	public static void main(String args[])
@@ -53,8 +55,14 @@ class Player
 			// pick up actions for next round for best solution
 			applyBestSolution();
 
-			if (DEBUG)
-				System.err.println("Round " + round + " done in " + (System.currentTimeMillis() - t0) + "ms");
+			if (DEBUG_SOLUTION)
+			{
+				System.err.println(
+						"Round " + round + " done in " + (System.currentTimeMillis() - t0) + "ms / Solutions found by simulation : " + nbSolutionsBySimulation);
+				System.err.println(
+						"Nb of rounds with all solutions tested : " + nbRoundsWithAllSolutionsTested);
+			}
+
 			round++;
 		}
 
@@ -76,31 +84,40 @@ class Player
 		static boolean DESTROYER_SKILL_ACTIVE = true;
 		static boolean DOOF_SKILL_ACTIVE = true;
 
-		static int ANGLE = 15;
-		static int ANGLE2 = 30;
-		static double[] ALL_COSINUS;
-		static double[] ALL_SINUS;
-		static double[] ALL_COSINUS2;
-		static double[] ALL_SINUS2;
+		static class PowerIterator
+		{
+
+			int start;
+			int step;
+
+			public PowerIterator(int start, int step)
+			{
+				this.start = start;
+				this.step = step;
+			}
+		}
+
+		final static PowerIterator POWER_ITERATOR_ROUND1 = new PowerIterator(100, 100);
+		final static PowerIterator POWER_ITERATOR_ROUND2 = new PowerIterator(200, -1);
+		final static int ANGLE_STEP_ROUND1 = 15;
+		final static int ANGLE_STEP_ROUND2 = 30;
+		final static double[] ALL_COSINUS_ROUND1 = new double[360 / ANGLE_STEP_ROUND1];
+		final static double[] ALL_SINUS_ROUND1 = new double[360 / ANGLE_STEP_ROUND1];;
+		final static double[] ALL_COSINUS_ROUND2 = new double[360 / ANGLE_STEP_ROUND2];
+		final static double[] ALL_SINUS_ROUND2 = new double[360 / ANGLE_STEP_ROUND2];
 
 		public Game(int gameVersion)
 		{
-			ALL_COSINUS = new double[360 / ANGLE];
-			ALL_SINUS = new double[360 / ANGLE];
-
-			for (int i = 0; i < (360 / ANGLE); i++)
+			for (int i = 0; i < (360 / ANGLE_STEP_ROUND1); i++)
 			{
-				ALL_COSINUS[i] = Math.cos(2.0 * Math.PI * ((double) i * ANGLE) / 360.0);
-				ALL_SINUS[i] = Math.sin(2.0 * Math.PI * ((double) i * ANGLE) / 360.0);
+				ALL_COSINUS_ROUND1[i] = Math.cos(2.0 * Math.PI * ((double) i * ANGLE_STEP_ROUND1) / 360.0);
+				ALL_SINUS_ROUND1[i] = Math.sin(2.0 * Math.PI * ((double) i * ANGLE_STEP_ROUND1) / 360.0);
 			}
 
-			ALL_COSINUS2 = new double[360 / ANGLE2];
-			ALL_SINUS2 = new double[360 / ANGLE2];
-
-			for (int i = 0; i < (360 / ANGLE2); i++)
+			for (int i = 0; i < (360 / ANGLE_STEP_ROUND2); i++)
 			{
-				ALL_COSINUS2[i] = Math.cos(2.0 * Math.PI * ((double) i * ANGLE2) / 360.0);
-				ALL_SINUS2[i] = Math.sin(2.0 * Math.PI * ((double) i * ANGLE2) / 360.0);
+				ALL_COSINUS_ROUND2[i] = Math.cos(2.0 * Math.PI * ((double) i * ANGLE_STEP_ROUND2) / 360.0);
+				ALL_SINUS_ROUND2[i] = Math.sin(2.0 * Math.PI * ((double) i * ANGLE_STEP_ROUND2) / 360.0);
 			}
 
 			GAME_VERSION = gameVersion;
@@ -223,6 +240,7 @@ class Player
 		{
 			RoundAction roundAction;
 			int nbSimu = 0;
+			boolean bestFromSimu = false;
 
 			int playerScore = innerPlayers.get(0).score;
 
@@ -234,28 +252,37 @@ class Player
 			Action w23 = actionWait();
 
 			// push an heuristic as default action if not better has been found
-			Action destroyerAction1 = findClosest(this, looters.get(1), TYPE_TANKER);
-			Action doofAction1 = doofAction(this, looters.get(2));
-			Action defaultAction = findClosest(this, looters.get(1), TYPE_WRECK);
+			Action destroyerAction1 = destroyerAction(this);
+			Action doofAction1 = doofAction(this);
+			Action defaultAction = reaperAction(this);
 			Player.bestActions = Arrays.asList(defaultAction, destroyerAction1, doofAction1);
 			int bestScore = playerScore; // we expect to find better than current score
 
-			if (DEBUG)
+			if (DEBUG_SOLUTION)
 				System.err.println("Before simulation after " + (System.currentTimeMillis() - t0) + "ms");
 
 			long duplicate = 0;
 			long arrays1 = 0;
 			long update = 0;
 			long start = System.nanoTime();
+			int nbMaxSimu = 0;
 			try
 			{
 				// random check for reaper
 				List<List<Action>> possibleActions = listPossibleActionsForReaperForRounds();
-				if (DEBUG)
-					System.err.println("Work for " + possibleActions.size() + " actions");
+				nbMaxSimu = possibleActions.size();
+				if (DEBUG_SOLUTION)
+					System.err.println("Max nb of simu : " + possibleActions.size());
 
-				for (List<Action> reaperActions : possibleActions)
+				for (int i = 0; i < nbMaxSimu; i++)
 				{
+					List<Action> reaperActions = possibleActions.get(i);
+					if ((System.currentTimeMillis() - t0) > timeLimit)
+					{
+						nbSolutionsBySimulation += bestFromSimu ? 1 : 0;
+						break;
+					}
+
 					long t100 = System.nanoTime();
 					Game game = new Game(this);
 					duplicate += System.nanoTime() - t100;
@@ -273,8 +300,8 @@ class Player
 
 					// STEP 2
 					// compute new destroyer / doof actions in game at next step
-					Action destroyerAction2 = findClosest(game, looters.get(1), TYPE_TANKER);
-					Action doofAction2 = doofAction(game, looters.get(2));
+					Action destroyerAction2 = destroyerAction(game);
+					Action doofAction2 = doofAction(game);
 
 					roundAction.actions = Arrays.asList(reaperActions.get(1), destroyerAction2, doofAction2, w11, w12, w13, w21, w22, w23);
 					game.evolve(roundAction);
@@ -285,7 +312,7 @@ class Player
 					// register solution only if the projected score is better than the score
 					if (value > bestScore)
 					{
-						if (DEBUG)
+						if (DEBUG_SOLUTION)
 						{
 							System.err.println("solution : " + value + " - looter from " + looters.get(0).x + "," + looters.get(0).y +
 									" to A: " + pt1.x + "," + pt1.y +
@@ -295,13 +322,10 @@ class Player
 						}
 						Player.bestActions = Arrays.asList(reaperActions.get(0), destroyerAction1, doofAction1);
 
+						bestFromSimu = true;
 						bestScore = value;
 					}
 
-					if ((System.currentTimeMillis() - t0) > timeLimit)
-					{
-						break;
-					}
 					nbSimu++;
 				}
 			}
@@ -310,105 +334,15 @@ class Player
 				e.printStackTrace();
 			}
 
-			if (DEBUG)
+			nbRoundsWithAllSolutionsTested += (nbSimu == nbMaxSimu) ? 1 : 0;
+
+			if (DEBUG_SOLUTION)
 			{
 				System.err.println("Nb simulations : " + nbSimu);
 				System.err.println("times : " + (duplicate / 1000000) + ", " + (arrays1 / 1000000) + ", " + (update / 1000000) + " / "
 						+ ((System.nanoTime() - start) / 1000000));
 			}
 		}
-
-//		public void findBestAction(long t0, long timeLimit)
-//		{
-//			RoundAction roundAction;
-//			int nbSimu = 0;
-//
-////			heuristic();
-////			if (1 == 1)
-////				return;
-//
-//			int playerScore = innerPlayers.get(0).score;
-//
-//			Action w11 = actionWait();
-//			Action w12 = actionWait();
-//			Action w13 = actionWait();
-//			Action w21 = actionWait();
-//			Action w22 = actionWait();
-//			Action w23 = actionWait();
-//
-//			// Destroyer & Doof follow heuristic rules
-//			Action destroyerAction = findClosest(this, looters.get(1), TYPE_TANKER);
-//			Action doofAction = doofAction(this, looters.get(2));
-//
-//			// push an heuristic as default action if not better has been found
-//			Action defaultAction = findClosest(this, looters.get(1), TYPE_WRECK);
-//			Player.bestActions = Arrays.asList(defaultAction, destroyerAction, doofAction);
-//			System.err.println("Before simulation after " + (System.currentTimeMillis() - t0) + "ms");
-//
-//			int bestScore = playerScore;
-//			long duplicate = 0;
-//			long arrays1 = 0;
-//			long update = 0;
-//			long start = System.nanoTime();
-//			try
-//			{
-//				// random check for reaper
-//				List<Action> possibleActions = listPossibleActionsForReaper();
-//
-//				// copy original game
-//				int i = 0;
-//				for (Action reaperAction : possibleActions)
-//				{
-//					i++;
-//					long t100 = System.nanoTime();
-//					Game game = new Game(this);
-//					duplicate += System.nanoTime() - t100;
-//					long t101 = System.nanoTime();
-//
-//					roundAction = new RoundAction();
-//					roundAction.actions = Arrays.asList(reaperAction, destroyerAction, doofAction, w11, w12, w13, w21, w22, w23);
-//					arrays1 += System.nanoTime() - t101;
-//					long t102 = System.nanoTime();
-//
-//					game.evolve(roundAction);
-//					Point pt1 = new Point(game.looters.get(0).x, game.looters.get(0).y);
-//					int value = game.evaluate();
-//					game.evolve(roundAction);
-//					Point pt2 = new Point(game.looters.get(0).x, game.looters.get(0).y);
-//					value += game.evaluate() - playerScore;
-//					game.evolve(roundAction);
-//					value += game.evaluate() - playerScore;
-//					update += System.nanoTime() - t102;
-//
-//					// register solution only if the projected score is better than the score
-//					if (value > bestScore)
-//					{
-//						System.err.println(i + " solution : " + value + " - looter from " + looters.get(0).x + "," + looters.get(0).y +
-//								" to A: " + pt1.x + "," + pt1.y +
-//								" to B: " + pt2.x + "," + pt2.y +
-//								" to C: " + game.looters.get(0).x + "," + game.looters.get(0).y
-//								+ " with power " + roundAction.actions.get(0).extra);
-//						Player.bestActions = Arrays.asList(reaperAction, destroyerAction, doofAction);
-//
-//						bestScore = value;
-//					}
-//
-//					if ((System.currentTimeMillis() - t0) > timeLimit)
-//					{
-//						break;
-//					}
-//					nbSimu++;
-//				}
-//			}
-//			catch (Exception e)
-//			{
-//				e.printStackTrace();
-//			}
-//
-//			System.err.println("Nb simulations : " + nbSimu);
-//			System.err.println("times : " + (duplicate / 1000000) + ", " + (arrays1 / 1000000) + ", " + (update / 1000000) + " / "
-//					+ ((System.nanoTime() - start) / 1000000));
-//		}
 
 		public List<List<Action>> listPossibleActionsForReaperForRounds()
 		{
@@ -422,30 +356,33 @@ class Player
 			Looter reaper = looters.get(0);
 			double x = reaper.x;
 			double y = reaper.y;
-			for (int i = 0; i < (360 / ANGLE); i++)
+			int powerLimit1 = POWER_ITERATOR_ROUND1.step != -1 ? 300 : POWER_ITERATOR_ROUND1.start;
+			int powerStep1 = POWER_ITERATOR_ROUND1.step != -1 ? POWER_ITERATOR_ROUND1.step : 300;
+			int powerLimit2 = POWER_ITERATOR_ROUND2.step != -1 ? 300 : POWER_ITERATOR_ROUND2.start;
+			int powerStep2 = POWER_ITERATOR_ROUND2.step != -1 ? POWER_ITERATOR_ROUND2.step : 300;
+			for (int i = 0; i < (360 / ANGLE_STEP_ROUND1); i++)
 			{
-				for (int power = 100; power <= 300; power += 100)
+				for (int power = POWER_ITERATOR_ROUND1.start; power <= powerLimit1; power += powerStep1)
 				{
-					Action action = actionMove((int) (x + r * ALL_COSINUS[i]), (int) (y + r * ALL_SINUS[i]), power);
+					Action action = actionMove((int) (x + r * ALL_COSINUS_ROUND1[i]), (int) (y + r * ALL_SINUS_ROUND1[i]), power);
 					actions.add(Arrays.asList(actionWait(), action));
 				}
 			}
 
 			// then append one step all around and a next one all around (with less angles)
-			for (int i = 0; i < (360 / ANGLE); i++)
+			for (int i = 0; i < (360 / ANGLE_STEP_ROUND1); i++)
 			{
 				for (int power1 = 100; power1 <= 300; power1 += 100)
 				{
-					Action action1 = actionMove((int) (x + r * ALL_COSINUS[i]), (int) (y + r * ALL_SINUS[i]), power1);
+					Action action1 = actionMove((int) (x + r * ALL_COSINUS_ROUND1[i]), (int) (y + r * ALL_SINUS_ROUND1[i]), power1);
 
-					for (int j = 0; j < (360 / ANGLE2); j++)
+					for (int j = 0; j < (360 / ANGLE_STEP_ROUND2); j++)
 					{
-						int power2 = 200;
-//						for (int power2 = 100; power2 <= 300; power2 += 100)
-//						{
-						Action action2 = actionMove((int) (x + r * ALL_COSINUS2[j]), (int) (y + r * ALL_SINUS2[j]), power2);
-						actions.add(Arrays.asList(action1, action2));
-//						}
+						for (int power2 = POWER_ITERATOR_ROUND2.start; power2 <= powerLimit2; power2 += powerStep2)
+						{
+							Action action2 = actionMove((int) (x + r * ALL_COSINUS_ROUND2[j]), (int) (y + r * ALL_SINUS_ROUND2[j]), power2);
+							actions.add(Arrays.asList(action1, action2));
+						}
 					}
 				}
 			}
@@ -464,12 +401,12 @@ class Player
 			// all 10° x 6 possible powers from 50 to 300 by step of 50 : taht is 36 * 6 = 216 possibilities
 			double x = looters.get(0).x;
 			double y = looters.get(0).y;
-			for (int i = 0; i < (360 / ANGLE); i++)
+			for (int i = 0; i < (360 / ANGLE_STEP_ROUND1); i++)
 			{
 //				for (int power = 50; power <= 300; power += 50)
 				for (int power = 150; power <= 300; power += 50)
 				{
-					Action action = actionMove((int) (x + r * ALL_COSINUS[i]), (int) (y + r * ALL_SINUS[i]), power);
+					Action action = actionMove((int) (x + r * ALL_COSINUS_ROUND1[i]), (int) (y + r * ALL_SINUS_ROUND1[i]), power);
 					actions.add(action);
 				}
 			}
@@ -477,21 +414,174 @@ class Player
 			return actions;
 		}
 
-		private void heuristic()
+//		private void heuristic()
+//		{
+//			Action action1 = findClosest(this, looters.get(0), TYPE_WRECK);
+//			Action action2 = findClosest(this, looters.get(1), TYPE_TANKER);
+//			Action action3 = doofAction(this, looters.get(2));
+//
+//			RoundAction rAction = new RoundAction();
+//			rAction.actions = Arrays.asList(action1, action2, action3);
+//
+//			Solution sol = new Solution();
+//			sol.actions = Collections.singletonList(rAction);
+//			sol.value = 1;
+//		}
+
+		private static Action reaperAction(Game game)
 		{
-			Action action1 = findClosest(this, looters.get(0), TYPE_WRECK);
-			Action action2 = findClosest(this, looters.get(1), TYPE_TANKER);
-			Action action3 = doofAction(this, looters.get(2));
+			Point target = null;
+			double distanceMin = Double.MAX_VALUE;
+			int power = 0;
 
-			RoundAction rAction = new RoundAction();
-			rAction.actions = Arrays.asList(action1, action2, action3);
+			Looter looter = game.looters.get(0);
+			for (Wreck wreck : game.wrecks)
+			{
+				if (wreck.water <= 0)
+				{
+					continue;
+				}
+				double distance = wreck.distance(looter);
+				if (distance < distanceMin)
+				{
+					distanceMin = distance;
+					target = wreck;
+				}
+			}
+			if (target != null)
+			{
+				power = distanceMin <= 300 ? (int) (distanceMin / 10) : 300;
+			}
+//					if (target != null && DEBUG)
+//					{
+//						System.err.println("Looper " + looter.id + " targets tanker " + ((Tanker) target).id + " at " + target.x + "," + target.y);
+//					}
+			if (target != null)
+			{
+				power = 300;
+			}
 
-			Solution sol = new Solution();
-			sol.actions = Collections.singletonList(rAction);
-			sol.value = 1;
+			if (target != null)
+			{
+				return Game.actionMove(new Double(target.x).intValue(), new Double(target.y).intValue(), power);
+			}
+
+			return targetWinnerReaper(game);
 		}
 
-		private static Action doofAction(Game game, Looter looter)
+		private static Action destroyerAction(Game game)
+		{
+			Point target = null;
+			double distanceMin = Double.MAX_VALUE;
+			int power = 0;
+//			InnerPlayer me = game.innerPlayers.get(0);
+//			Looter reaper0 = game.looters.get(0);
+//			Looter reaper1 = game.looters.get(3);
+//			Looter reaper2 = game.looters.get(6);
+
+			Looter myDestroyer = game.looters.get(1);
+			for (Tanker tanker : game.tankers)
+			{
+				if (tanker.water <= 0)
+				{
+					continue;
+				}
+				double distance = tanker.distance(myDestroyer);
+				if (distance < distanceMin)
+				{
+//					// validate this tanker as a target only if my reaper is the closest reaper to it
+//					double d0 = reaper0.distance(tanker);
+//					double d1 = reaper1.distance(tanker);
+//					double d2 = reaper2.distance(tanker);
+//
+//					if (d0 < d1 && d0 < d2)
+//					{
+					distanceMin = distance;
+					target = tanker;
+//					}
+				}
+			}
+
+			// if too far, cancel the target
+			if (distanceMin > 3000)
+			{
+				target = null;
+			}
+//					if (target != null && DEBUG)
+//					{
+//						System.err.println("Looper " + looter.id + " targets tanker " + ((Tanker) target).id + " at " + target.x + "," + target.y);
+//					}
+			if (target != null)
+			{
+				power = 300;
+			}
+
+			if (target != null)
+			{
+				return Game.actionMove(new Double(target.x).intValue(), new Double(target.y).intValue(), power);
+			}
+			// I am not convinced by this heuristic !
+//			else if (me.rage > 100) // enough rage ?
+//			{
+//				// alternative action : launch a grenade
+//				// look if an opponent reaper in a wreck
+//				boolean isReaper1InWreck = isReaperInWreck(game, reaper1) && reaper1.isInRange(myDestroyer, 2000); // also within skill range ?
+//				boolean isReaper2InWreck = isReaperInWreck(game, reaper2) && reaper2.isInRange(myDestroyer, 2000); // also within skill range ?
+//
+//				if (isReaper1InWreck && !isReaper2InWreck)
+//				{
+//					target = reaper1;
+//				}
+//				else if (!isReaper1InWreck && isReaper2InWreck)
+//				{
+//					target = reaper2;
+//				}
+//				else if (isReaper1InWreck)
+//				{
+//					if (game.innerPlayers.get(1).score > game.innerPlayers.get(2).score)
+//						target = reaper1;
+//					else
+//						target = reaper2;
+//				}
+//
+//				if (target != null)
+//				{
+//					// if my reaper is too close, cancel
+//					Looter myReaper = game.looters.get(0);
+//					if (!myReaper.isInRange(target, DESTROYER_SKILL_RADIUS))
+//					{
+//						if (DEBUG_SOLUTION)
+//						{
+//							System.err.println("Launch grenade to " + target.x + "," + target.y);
+//						}
+//						// TODO : find a point between my reaper and the target, close to the target
+//						// so expulse it in an opposite way to my reaper
+//						return actionSkill(new Double(target.x - 10).intValue(), new Double(target.y - 10).intValue());
+//					}
+//					else
+//					{
+//						if (DEBUG_SOLUTION)
+//						{
+//							System.err.println("Cancel grenade --> reaper too close !");
+//						}
+//					}
+//				}
+//			}
+
+			return targetWinnerReaper(game);
+		}
+
+		private static boolean isReaperInWreck(Game game, Looter reaper)
+		{
+			return game.wrecks.stream().anyMatch(w -> reaper.isInRange(w, w.radius));
+		}
+
+		private static Action doofAction(Game game)
+		{
+			return targetWinnerReaper(game);
+		}
+
+		private static Action targetWinnerReaper(Game game)
 		{
 			// find the opponent with the best score
 			if (game.innerPlayers.get(1).score > game.innerPlayers.get(2).score)
@@ -504,92 +594,11 @@ class Player
 			}
 		}
 
-		public static Action findClosest(Game game, Looter looter, int typeUnit)
-		{
-			Point target = null;
-			double distanceMin = Double.MAX_VALUE;
-			int power = 0;
-
-//			// emergency situation --> focus on winning reaper
-//			int playerScore = innerPlayers.get(0).score;
-//			int opponent1Score = innerPlayers.get(1).score;
-//			int opponent2Score = innerPlayers.get(2).score;
-//			boolean losing = playerScore < opponent1Score || playerScore < opponent2Score;
-//			if ((opponent1Score >= 40 || opponent2Score >= 40) && playerScore < 40)
-//			{
-//				return nextOnCircle(looter);
-//			}
-//			if (Player.round >= 150 && losing)
-//			{
-//				return nextOnCircle(looter);
-//			}
-
-			switch (typeUnit)
-			{
-				case 4: // WRECK
-					for (Wreck wreck : game.wrecks)
-					{
-						if (wreck.water <= 0)
-						{
-							continue;
-						}
-						double distance = wreck.distance(looter);
-						if (distance < distanceMin)
-						{
-							distanceMin = distance;
-							target = wreck;
-						}
-					}
-					if (target != null)
-					{
-						power = distanceMin <= 300 ? (int) (distanceMin / 10) : 300;
-					}
-					break;
-				case 3: // TANKER
-					for (Tanker tanker : game.tankers)
-					{
-						if (tanker.water <= 0)
-						{
-							continue;
-						}
-						double distance = tanker.distance(looter);
-						if (distance < distanceMin)
-						{
-							distanceMin = distance;
-							target = tanker;
-						}
-					}
-//					if (target != null && DEBUG)
-//					{
-//						System.err.println("Looper " + looter.id + " targets tanker " + ((Tanker) target).id + " at " + target.x + "," + target.y);
-//					}
-					if (target != null)
-					{
-						power = 300;
-					}
-					break;
-			}
-
-			if (target != null)
-			{
-				return Game.actionMove(new Double(target.x).intValue(), new Double(target.y).intValue(), power);
-			}
-
-//			return Game.actionWait();
-			return doofAction(game, looter);
-		}
-
 		private void evolve(RoundAction roundAction) throws Exception
 		{
-			handleActions(roundAction.actions);
+			handleActions(roundAction.actions.toArray(new Action[]
+			{}));
 			updateGame(0);
-		}
-
-		static class Solution
-		{
-
-			List<RoundAction> actions; // one round action per round
-			int value;
 		}
 
 		static class RoundAction
@@ -804,14 +813,11 @@ class Player
 			return looter;
 		}
 
-		public void handleActions(List<Action> actions) throws Exception
+		public void handleActions(Action[] actions) throws Exception
 		{
-			List<Action> actionsFor0 = Arrays.asList(actions.get(0), actions.get(1), actions.get(2));
-			handlePlayerOutput(0, actionsFor0);
-			List<Action> actionsFor1 = Arrays.asList(actions.get(3), actions.get(4), actions.get(5));
-			handlePlayerOutput(1, actionsFor1);
-			List<Action> actionsFor2 = Arrays.asList(actions.get(6), actions.get(7), actions.get(8));
-			handlePlayerOutput(2, actionsFor2);
+			handlePlayerOutput(0, actions, 0);
+			handlePlayerOutput(1, actions, 3);
+			handlePlayerOutput(2, actions, 6);
 		}
 
 		protected void initEmpty()
@@ -1321,14 +1327,14 @@ class Player
 			}
 		}
 
-		protected void handlePlayerOutput(int playerIdx, List<Action> actions) throws Exception
+		protected void handlePlayerOutput(int playerIdx, Action[] actions, int idx1) throws Exception
 		{
 			InnerPlayer innerPlayer = innerPlayers.get(playerIdx);
 
 			for (int i = 0; i < LOOTER_COUNT; ++i)
 			{
 				Looter looter = innerPlayer.looters[i];
-				Action action = actions.get(i);
+				Action action = actions[idx1 + i];
 
 				if (action.what.equals(ActionType.MOVE))
 				{
@@ -1380,23 +1386,8 @@ class Player
 			return s * (int) Math.round(s * x);
 		}
 
-		// Join multiple object into a space separated string
-		static public String join(Object... args)
-		{
-			return Stream.of(args).map(String::valueOf).collect(Collectors.joining(" "));
-		}
-
 		private static class GameOverException extends Exception
 		{
-		}
-
-		private static class InvalidInputException extends Exception
-		{
-
-			public InvalidInputException(String expected, String line)
-			{
-				super("Invalid line : " + line + " / Expected : " + expected);
-			}
 		}
 
 		private static class NoRageException extends Exception
@@ -1511,7 +1502,7 @@ class Player
 					return false;
 				if (getClass() != obj.getClass())
 					return false;
-				Point other = (Point) obj;
+				final Point other = (Point) obj;
 				return (x == other.x) && (y == other.y);
 
 //				if (this == obj)
