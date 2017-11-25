@@ -268,15 +268,16 @@ class Player
 			int nbMaxSimu = 0;
 			try
 			{
-				// random check for reaper
-				List<List<Action>> possibleActions = listPossibleActionsForReaperForRounds();
-				nbMaxSimu = possibleActions.size();
+				// list possible actions for reaper
+				Action[][] allActions = listPossibleActionsForReaper();
+
+				nbMaxSimu = allActions.length;
 				if (DEBUG_SOLUTION)
-					System.err.println("Max nb of simu : " + possibleActions.size());
+					System.err.println("Max nb of simu : " + nbMaxSimu);
 
 				for (int i = 0; i < nbMaxSimu; i++)
 				{
-					List<Action> reaperActions = possibleActions.get(i);
+					Action[] reaperActions = allActions[i];
 					if ((System.currentTimeMillis() - t0) > timeLimit)
 					{
 						nbSolutionsBySimulation += bestFromSimu ? 1 : 0;
@@ -290,7 +291,7 @@ class Player
 
 					// STEP 1
 					roundAction = new RoundAction();
-					roundAction.actions = Arrays.asList(reaperActions.get(0), destroyerAction1, doofAction1, w11, w12, w13, w21, w22, w23);
+					roundAction.actions = Arrays.asList(reaperActions[0], destroyerAction1, doofAction1, w11, w12, w13, w21, w22, w23);
 					arrays1 += System.nanoTime() - t101;
 					long t102 = System.nanoTime();
 
@@ -303,7 +304,7 @@ class Player
 					Action destroyerAction2 = destroyerAction(game);
 					Action doofAction2 = doofAction(game);
 
-					roundAction.actions = Arrays.asList(reaperActions.get(1), destroyerAction2, doofAction2, w11, w12, w13, w21, w22, w23);
+					roundAction.actions = Arrays.asList(reaperActions[1], destroyerAction2, doofAction2, w11, w12, w13, w21, w22, w23);
 					game.evolve(roundAction);
 					Point pt2 = new Point(game.looters.get(0).x, game.looters.get(0).y);
 					value += game.evaluate() - playerScore;
@@ -320,7 +321,7 @@ class Player
 									" to C: " + game.looters.get(0).x + "," + game.looters.get(0).y
 									+ " with power " + roundAction.actions.get(0).extra);
 						}
-						Player.bestActions = Arrays.asList(reaperActions.get(0), destroyerAction1, doofAction1);
+						Player.bestActions = Arrays.asList(reaperActions[0], destroyerAction1, doofAction1);
 
 						bestFromSimu = true;
 						bestScore = value;
@@ -342,6 +343,19 @@ class Player
 				System.err.println("times : " + (duplicate / 1000000) + ", " + (arrays1 / 1000000) + ", " + (update / 1000000) + " / "
 						+ ((System.nanoTime() - start) / 1000000));
 			}
+		}
+
+		private Action[][] listPossibleActionsForReaper()
+		{
+			List<List<Action>> possibleActions = listPossibleActionsForReaperForRounds();
+			Action[][] allActions = new Action[possibleActions.size()][];
+			int idx = 0;
+			for (List<Action> nestedList : possibleActions)
+			{
+				allActions[idx++] = nestedList.toArray(new Action[nestedList.size()]);
+			}
+
+			return allActions;
 		}
 
 		public List<List<Action>> listPossibleActionsForReaperForRounds()
@@ -389,44 +403,6 @@ class Player
 
 			return actions;
 		}
-
-		public List<Action> listPossibleActionsForReaper()
-		{
-			int r = 3000;
-			List<Action> actions = new ArrayList<>();
-
-			// always try with wait
-			actions.add(actionWait());
-
-			// all 10° x 6 possible powers from 50 to 300 by step of 50 : taht is 36 * 6 = 216 possibilities
-			double x = looters.get(0).x;
-			double y = looters.get(0).y;
-			for (int i = 0; i < (360 / ANGLE_STEP_ROUND1); i++)
-			{
-//				for (int power = 50; power <= 300; power += 50)
-				for (int power = 150; power <= 300; power += 50)
-				{
-					Action action = actionMove((int) (x + r * ALL_COSINUS_ROUND1[i]), (int) (y + r * ALL_SINUS_ROUND1[i]), power);
-					actions.add(action);
-				}
-			}
-
-			return actions;
-		}
-
-//		private void heuristic()
-//		{
-//			Action action1 = findClosest(this, looters.get(0), TYPE_WRECK);
-//			Action action2 = findClosest(this, looters.get(1), TYPE_TANKER);
-//			Action action3 = doofAction(this, looters.get(2));
-//
-//			RoundAction rAction = new RoundAction();
-//			rAction.actions = Arrays.asList(action1, action2, action3);
-//
-//			Solution sol = new Solution();
-//			sol.actions = Collections.singletonList(rAction);
-//			sol.value = 1;
-//		}
 
 		private static Action reaperAction(Game game)
 		{
