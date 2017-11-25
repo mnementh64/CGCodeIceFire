@@ -238,7 +238,6 @@ class Player
 
 		public void findBestAction(long t0, long timeLimit)
 		{
-			RoundAction roundAction;
 			int nbSimu = 0;
 			boolean bestFromSimu = false;
 
@@ -290,12 +289,11 @@ class Player
 					long t101 = System.nanoTime();
 
 					// STEP 1
-					roundAction = new RoundAction();
-					roundAction.actions = Arrays.asList(reaperActions[0], destroyerAction1, doofAction1, w11, w12, w13, w21, w22, w23);
 					arrays1 += System.nanoTime() - t101;
 					long t102 = System.nanoTime();
 
-					game.evolve(roundAction);
+					game.evolve(new Action[]
+					{ reaperActions[0], destroyerAction1, doofAction1, w11, w12, w13, w21, w22, w23 });
 					Point pt1 = new Point(game.looters.get(0).x, game.looters.get(0).y);
 					int value = game.evaluate();
 
@@ -304,8 +302,8 @@ class Player
 					Action destroyerAction2 = destroyerAction(game);
 					Action doofAction2 = doofAction(game);
 
-					roundAction.actions = Arrays.asList(reaperActions[1], destroyerAction2, doofAction2, w11, w12, w13, w21, w22, w23);
-					game.evolve(roundAction);
+					game.evolve(new Action[]
+					{ reaperActions[1], destroyerAction2, doofAction2, w11, w12, w13, w21, w22, w23 });
 					Point pt2 = new Point(game.looters.get(0).x, game.looters.get(0).y);
 					value += game.evaluate() - playerScore;
 					update += System.nanoTime() - t102;
@@ -319,7 +317,7 @@ class Player
 									" to A: " + pt1.x + "," + pt1.y +
 									" to B: " + pt2.x + "," + pt2.y +
 									" to C: " + game.looters.get(0).x + "," + game.looters.get(0).y
-									+ " with power " + roundAction.actions.get(0).extra);
+									+ " with power " + reaperActions[0].extra);
 						}
 						Player.bestActions = Arrays.asList(reaperActions[0], destroyerAction1, doofAction1);
 
@@ -570,10 +568,9 @@ class Player
 			}
 		}
 
-		private void evolve(RoundAction roundAction) throws Exception
+		private void evolve(Action[] actions) throws Exception
 		{
-			handleActions(roundAction.actions.toArray(new Action[]
-			{}));
+			handleActions(actions);
 			updateGame(0);
 		}
 
