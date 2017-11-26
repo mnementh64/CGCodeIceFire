@@ -16,7 +16,7 @@ class Player
 
 	static boolean DEBUG = false;
 	static boolean DEBUG_SOLUTION = true;
-	static boolean DEBUG_INPUT = false;
+	static boolean DEBUG_INPUT = true;
 	private static final long GAME_TIME_LIMIT_FIRST = 960;
 	private static final long GAME_TIME_LIMIT = 40;
 
@@ -231,6 +231,7 @@ class Player
 			int nbSimu = 0;
 			boolean bestFromSimu = false;
 			List<Action> bestActions;
+			Game game;
 
 			int playerScore = innerPlayers.get(0).score;
 
@@ -246,13 +247,22 @@ class Player
 			Action doofAction1 = doofAction(this);
 			Action defaultAction = reaperAction(this);
 
-			// evaluate the my score with these actions
-
+			// evaluate the my score with these default heuristic actions
+			game = new Game(this);
+			try
+			{
+				game.evolve(new Action[]
+				{ defaultAction, destroyerAction1, doofAction1, w11, w12, w13, w21, w22, w23 });
+			}
+			catch (Exception e)
+			{
+				e.printStackTrace();
+			}
+			int bestScore = game.evaluate();
 			bestActions = Arrays.asList(defaultAction, destroyerAction1, doofAction1);
-			int bestScore = playerScore; // we expect to find better than current score
 
 			if (DEBUG_SOLUTION)
-				System.err.println("Before simulation after " + (System.currentTimeMillis() - t0) + "ms");
+				System.err.println("Before simulation after " + (System.currentTimeMillis() - t0) + "ms - score by heuristic : " + bestScore);
 
 			int nbMaxSimu = 0;
 			try
@@ -272,7 +282,8 @@ class Player
 						break;
 					}
 
-					Game game = new Game(this);
+					// work on game duplicate
+					game = new Game(this);
 
 					// STEP 1
 					game.evolve(new Action[]
@@ -971,6 +982,25 @@ class Player
 				{
 					wreck.water = extra;
 				}
+			}
+			else if (unitType == TYPE_REAPER_SKILL_EFFECT)
+			{
+				SkillEffect effect =
+						new ReaperSkillEffect(TYPE_REAPER_SKILL_EFFECT, x, y, REAPER_SKILL_RADIUS, REAPER_SKILL_DURATION, REAPER_SKILL_ORDER, null);
+				skillEffects.add(effect);
+			}
+			else if (unitType == TYPE_DESTROYER_SKILL_EFFECT)
+			{
+				SkillEffect effect =
+						new DestroyerSkillEffect(TYPE_DESTROYER_SKILL_EFFECT, x, y, DESTROYER_SKILL_RADIUS, DESTROYER_SKILL_DURATION, DESTROYER_SKILL_ORDER,
+								null);
+				skillEffects.add(effect);
+			}
+			else if (unitType == TYPE_DOOF_SKILL_EFFECT)
+			{
+				SkillEffect effect =
+						new DoofSkillEffect(TYPE_DOOF_SKILL_EFFECT, x, y, DOOF_SKILL_RADIUS, DOOF_SKILL_DURATION, DOOF_SKILL_ORDER, null);
+				skillEffects.add(effect);
 			}
 		}
 
