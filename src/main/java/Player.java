@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -394,38 +395,57 @@ class Player
 			return actions;
 		}
 
+		static class WreckInterest
+		{
+
+			Wreck wreck;
+			int score;
+
+			public WreckInterest(Wreck wreck)
+			{
+				this.wreck = wreck;
+			}
+		}
+
 		private static Action reaperAction(Game game)
 		{
 			Point target = null;
 			double distanceMin = Double.MAX_VALUE;
 			int power = 0;
-
 			Looter looter = game.looters.get(0);
-			for (Wreck wreck : game.wrecks)
+
+			// sort wreck by their interest (the number of other wrecks they intersect)
+			List<WreckInterest> wrecksByInterest = sortWrecksByInterest(game);
+			if (!wrecksByInterest.isEmpty())
 			{
-				if (wreck.water <= 0)
-				{
-					continue;
-				}
-				// if oil on wreck, skip it
-				if (isOilOnTarget(game, wreck))
-				{
-					continue;
-				}
-
-				// if tanker on target, skip it
-				if (tankerOnTarget(game, wreck))
-				{
-					continue;
-				}
-
-				double distance = wreck.distance(looter);
-				if (distance < distanceMin)
-				{
-					distanceMin = distance;
-					target = wreck;
-				}
+				target = wrecksByInterest.get(0).wreck;
 			}
+
+//			for (Wreck wreck : game.wrecks)
+//			{
+//				if (wreck.water <= 0)
+//				{
+//					continue;
+//				}
+//				// if oil on wreck, skip it
+//				if (isOilOnTarget(game, wreck))
+//				{
+//					continue;
+//				}
+//
+//				// if tanker on target, skip it
+//				if (isTankerOnTarget(game, wreck))
+//				{
+//					continue;
+//				}
+//
+//				double distance = wreck.distance(looter);
+//				if (distance < distanceMin)
+//				{
+//					distanceMin = distance;
+//					target = wreck;
+//				}
+//			}
 			if (target != null)
 			{
 				power = distanceMin <= 300 ? (int) (distanceMin / 10) : 300;
@@ -447,7 +467,39 @@ class Player
 			return targetWinnerReaper(game);
 		}
 
-		private static boolean tankerOnTarget(Game game, Point target)
+		public static List<WreckInterest> sortWrecksByInterest(Game game)
+		{
+			List<WreckInterest> wreckByInterest = game.wrecks.stream()
+					.filter(wreck -> wreck.water > 0 && !isOilOnTarget(game, wreck) && !isTankerOnTarget(game, wreck))
+					.map(wreck ->
+					{
+						WreckInterest wi = new WreckInterest(wreck);
+						wi.score = wreck.water;
+						for (Wreck w : game.wrecks)
+						{
+							if (w.id == wreck.id)
+							{
+								continue;
+							}
+
+							// other wreck is at distance
+							if (w.distance(wreck) < (wreck.radius + w.radius) / 2)
+							{
+//								System.out.println("Wreck " + wreck.id + " intersect " + w.id);
+								wi.score += w.water;
+							}
+						}
+
+						wi.score = -wi.score;// negative value to use natural order
+
+						return wi;
+					}).collect(Collectors.toList());
+			wreckByInterest.sort(Comparator.comparingInt(value -> value.score));
+
+			return wreckByInterest;
+		}
+
+		private static boolean isTankerOnTarget(Game game, Point target)
 		{
 			return game.tankers.stream().anyMatch(tanker -> tanker.isInRange(target, tanker.radius));
 		}
@@ -598,7 +650,7 @@ class Player
 				{
 					// if my reaper is too close, cancel
 					Looter myReaper = game.looters.get(0);
-					if (!myReaper.isInRange(target, DESTROYER_SKILL_RADIUS))
+					if (!myReaper.isInRange(target, DOOF_SKILL_RADIUS))
 					{
 						if (DEBUG_SOLUTION)
 						{

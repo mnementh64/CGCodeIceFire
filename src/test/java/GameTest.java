@@ -1,3 +1,4 @@
+import java.util.List;
 import java.util.Scanner;
 
 import org.junit.Assert;
@@ -802,28 +803,35 @@ public class GameTest
 		System.out.println("Reaper at " + game.looters.get(0).x + ", " + game.looters.get(0).y);
 	}
 
-//	@Test
-//	public void test_listPossibleActionsForReaper() throws Exception
-//	{
-//		String raw = "0 0 0 0 0 0 12 " +
-//				"0 0 0 0.5 400 -1168 3138 0 0 -1 -1 " +
-//				"1 1 0 1.5 400 1366 2658 0 0 -1 -1 " +
-//				"2 2 0 1.0 400 2978 1517 0 0 -1 -1 " +
-//				"3 0 1 0.5 400 -2133 -2581 0 0 -1 -1 " +
-//				"4 1 1 1.5 400 -2985 -146 0 0 -1 -1 " +
-//				"5 2 1 1.0 400 -2803 1821 0 0 -1 -1 " +
-//				"6 0 2 0.5 400 3301 -557 0 0 -1 -1 " +
-//				"7 1 2 1.5 400 1619 -2512 0 0 -1 -1 " +
-//				"8 2 2 1.0 400 -176 -3338 0 0 -1 -1 " +
-//				"9 3 -1 3.0 600 8581 569 -399 -26 1 4 " +
-//				"10 3 -1 3.0 600 -4783 7147 222 -332 1 4 " +
-//				"11 3 -1 3.0 600 -3798 -7716 177 359 1 4";
-//		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
-//		game.createFromInputLines(new Scanner(raw));
-//
-//		List<Player.Game.Action> actions = game.listPossibleActionsForReaper();
-//
-//	}
+	@Test
+	public void test_sortWrecksByInterest() throws Exception
+	{
+		String raw = "32 36 31 300 185 272 19 " +
+				"0 0 0 0.5 400 2883 408 -625 -206 -1 -1 " +
+				"1 1 0 1.5 400 1844 1621 -234 269 -1 -1 " +
+				"2 2 0 1.0 400 -3519 4113 -321 -209 -1 -1 " +
+				"3 0 1 0.5 400 -2921 3384 3 -220 -1 -1 " +
+				"4 1 1 1.5 400 -2095 3118 54 -130 -1 -1 " +
+				"5 2 1 1.0 400 -1774 3892 141 -100 -1 -1 " +
+				"6 0 2 0.5 400 -2344 2327 184 -250 -1 -1 " +
+				"7 1 2 1.5 400 -1356 884 -376 -131 -1 -1 " +
+				"8 2 2 1.0 400 -1243 2987 186 76 -1 -1 " +
+				"98 3 -1 4.5 600 -3025 1495 -138 45 4 4 " +
+				"99 3 -1 6.5 850 -2542 -357 8 -3 8 9 " +
+				"103 3 -1 4.0 850 -897 -2219 56 139 3 9 " +
+				"105 3 -1 3.0 700 -833 4637 48 -240 1 6 " +
+				"107 3 -1 3.0 850 1023 -5473 -47 249 1 9 " +
+				"109 3 -1 3.0 700 7481 1491 -298 -59 1 6 " +
+				"85 4 -1 -1.0 600 776 2531 0 0 2 -1 " +
+				"97 4 -1 -1.0 600 -2851 -494 0 0 1 -1 " +
+				"104 4 -1 -1.0 850 2511 -291 0 0 2 -1 " +
+				"108 4 -1 -1.0 850 1929 1654 0 0 2 -1";
+		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
+		game.createFromInputLines(new Scanner(raw));
+
+		List<Player.Game.WreckInterest> wis = Player.Game.sortWrecksByInterest(game);
+		wis.forEach(w -> System.out.println("Wreck " + w.wreck.id + " -> score : " + w.score));
+	}
 
 	private void assertLooperPosition(Player.Game game, int looterIndex, int x, int y)
 	{
