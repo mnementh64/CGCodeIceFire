@@ -26,8 +26,6 @@ class Player
 	static int nbSolutionsBySimulation = 0;
 	static int nbRoundsWithAllSolutionsTested = 0;
 
-	static List<Game.Action> bestActions = null;
-
 	public static void main(String args[])
 	{
 		Scanner in = new Scanner(System.in);
@@ -47,13 +45,10 @@ class Player
 
 			if (DEBUG)
 				System.err.println("Init done in " + (System.currentTimeMillis() - t0) + "ms");
-			game.findBestAction(t0, round == 1 ? GAME_TIME_LIMIT_FIRST : GAME_TIME_LIMIT);
+			List<Game.Action> bestActions = game.findBestAction(t0, round == 1 ? GAME_TIME_LIMIT_FIRST : GAME_TIME_LIMIT);
 
-			// Write an action using System.out.println()
-			// To debug: System.err.println("Debug messages...");
-
-			// pick up actions for next round for best solution
-			applyBestSolution();
+			// apply the best solution
+			bestActions.stream().limit(3).map(Game.Action::toString).forEach(System.out::println);
 
 			if (DEBUG_SOLUTION)
 			{
@@ -66,11 +61,6 @@ class Player
 			round++;
 		}
 
-	}
-
-	static void applyBestSolution()
-	{
-		bestActions.stream().limit(3).map(Game.Action::toString).forEach(System.out::println);
 	}
 
 	static class Game
@@ -236,10 +226,11 @@ class Player
 		Map<Integer, Tanker> tankerIdToTankerMap = new HashMap<>();
 		Map<Integer, Wreck> wreckIdToWreckMap = new HashMap<>();
 
-		public void findBestAction(long t0, long timeLimit)
+		public List<Action> findBestAction(long t0, long timeLimit)
 		{
 			int nbSimu = 0;
 			boolean bestFromSimu = false;
+			List<Action> bestActions;
 
 			int playerScore = innerPlayers.get(0).score;
 
@@ -254,7 +245,7 @@ class Player
 			Action destroyerAction1 = destroyerAction(this);
 			Action doofAction1 = doofAction(this);
 			Action defaultAction = reaperAction(this);
-			Player.bestActions = Arrays.asList(defaultAction, destroyerAction1, doofAction1);
+			bestActions = Arrays.asList(defaultAction, destroyerAction1, doofAction1);
 			int bestScore = playerScore; // we expect to find better than current score
 
 			if (DEBUG_SOLUTION)
@@ -279,7 +270,6 @@ class Player
 					Action[] reaperActions = allActions[i];
 					if ((System.currentTimeMillis() - t0) > timeLimit)
 					{
-						nbSolutionsBySimulation += bestFromSimu ? 1 : 0;
 						break;
 					}
 
@@ -316,10 +306,9 @@ class Player
 							System.err.println("solution : " + value + " - looter from " + looters.get(0).x + "," + looters.get(0).y +
 									" to A: " + pt1.x + "," + pt1.y +
 									" to B: " + pt2.x + "," + pt2.y +
-									" to C: " + game.looters.get(0).x + "," + game.looters.get(0).y
-									+ " with power " + reaperActions[0].extra);
+									" (target " + reaperActions[0].x + "," + reaperActions[0].y + " with power " + reaperActions[0].extra + ")");
 						}
-						Player.bestActions = Arrays.asList(reaperActions[0], destroyerAction1, doofAction1);
+						bestActions = Arrays.asList(reaperActions[0], destroyerAction1, doofAction1);
 
 						bestFromSimu = true;
 						bestScore = value;
@@ -333,6 +322,7 @@ class Player
 				e.printStackTrace();
 			}
 
+			nbSolutionsBySimulation += bestFromSimu ? 1 : 0;
 			nbRoundsWithAllSolutionsTested += (nbSimu == nbMaxSimu) ? 1 : 0;
 
 			if (DEBUG_SOLUTION)
@@ -341,6 +331,8 @@ class Player
 				System.err.println("times : " + (duplicate / 1000000) + ", " + (arrays1 / 1000000) + ", " + (update / 1000000) + " / "
 						+ ((System.nanoTime() - start) / 1000000));
 			}
+
+			return bestActions;
 		}
 
 		private Action[][] listPossibleActionsForReaper()

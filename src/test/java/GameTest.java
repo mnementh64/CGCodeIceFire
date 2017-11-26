@@ -1,4 +1,3 @@
-import java.util.List;
 import java.util.Scanner;
 
 import org.junit.Assert;
@@ -666,8 +665,6 @@ public class GameTest
 		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
 		game.createFromInputLines(new Scanner(raw));
 		game.findBestAction(System.currentTimeMillis(), 100);
-
-		Player.applyBestSolution();
 	}
 
 	@Test
@@ -699,8 +696,6 @@ public class GameTest
 		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
 		game.createFromInputLines(new Scanner(raw));
 		game.findBestAction(System.currentTimeMillis(), 50);
-
-		Player.applyBestSolution();
 	}
 
 	@Test
