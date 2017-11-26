@@ -245,16 +245,15 @@ class Player
 			Action destroyerAction1 = destroyerAction(this);
 			Action doofAction1 = doofAction(this);
 			Action defaultAction = reaperAction(this);
+
+			// evaluate the my score with these actions
+
 			bestActions = Arrays.asList(defaultAction, destroyerAction1, doofAction1);
 			int bestScore = playerScore; // we expect to find better than current score
 
 			if (DEBUG_SOLUTION)
 				System.err.println("Before simulation after " + (System.currentTimeMillis() - t0) + "ms");
 
-			long duplicate = 0;
-			long arrays1 = 0;
-			long update = 0;
-			long start = System.nanoTime();
 			int nbMaxSimu = 0;
 			try
 			{
@@ -273,15 +272,9 @@ class Player
 						break;
 					}
 
-					long t100 = System.nanoTime();
 					Game game = new Game(this);
-					duplicate += System.nanoTime() - t100;
-					long t101 = System.nanoTime();
 
 					// STEP 1
-					arrays1 += System.nanoTime() - t101;
-					long t102 = System.nanoTime();
-
 					game.evolve(new Action[]
 					{ reaperActions[0], destroyerAction1, doofAction1, w11, w12, w13, w21, w22, w23 });
 					Point pt1 = new Point(game.looters.get(0).x, game.looters.get(0).y);
@@ -296,7 +289,6 @@ class Player
 					{ reaperActions[1], destroyerAction2, doofAction2, w11, w12, w13, w21, w22, w23 });
 					Point pt2 = new Point(game.looters.get(0).x, game.looters.get(0).y);
 					value += game.evaluate() - playerScore;
-					update += System.nanoTime() - t102;
 
 					// register solution only if the projected score is better than the score
 					if (value > bestScore)
@@ -328,8 +320,6 @@ class Player
 			if (DEBUG_SOLUTION)
 			{
 				System.err.println("Nb simulations : " + nbSimu);
-				System.err.println("times : " + (duplicate / 1000000) + ", " + (arrays1 / 1000000) + ", " + (update / 1000000) + " / "
-						+ ((System.nanoTime() - start) / 1000000));
 			}
 
 			return bestActions;
