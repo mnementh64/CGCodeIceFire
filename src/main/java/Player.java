@@ -737,6 +737,27 @@ class Player
 				wrecks.add(wreck);
 				wreckIdToWreckMap.put(wreck.id, wreck);
 			});
+
+			game.skillEffects.forEach(skillEffect ->
+			{
+				SkillEffect effect = null;
+				if (skillEffect.type == TYPE_REAPER_SKILL_EFFECT)
+				{
+					effect = new ReaperSkillEffect(TYPE_REAPER_SKILL_EFFECT, skillEffect.x, skillEffect.y, REAPER_SKILL_RADIUS, REAPER_SKILL_DURATION,
+							REAPER_SKILL_ORDER, null);
+				}
+				else if (skillEffect.type == TYPE_DESTROYER_SKILL_EFFECT)
+				{
+					effect = new DestroyerSkillEffect(TYPE_DESTROYER_SKILL_EFFECT, skillEffect.x, skillEffect.y, DESTROYER_SKILL_RADIUS,
+							DESTROYER_SKILL_DURATION, DESTROYER_SKILL_ORDER, null);
+				}
+				else if (skillEffect.type == TYPE_DOOF_SKILL_EFFECT)
+				{
+					effect = new DoofSkillEffect(TYPE_DOOF_SKILL_EFFECT, skillEffect.x, skillEffect.y, DOOF_SKILL_RADIUS, DOOF_SKILL_DURATION, DOOF_SKILL_ORDER,
+							null);
+				}
+				skillEffects.add(effect);
+			});
 		}
 
 		private void copyUnit(Unit from, Unit to)

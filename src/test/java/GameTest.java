@@ -658,6 +658,45 @@ public class GameTest
 		}
 	}
 
+	@Test
+	public void test_duplicate_game_with_skill() throws Exception
+	{
+		String raw = "7 10 7 201 43 35 21 " +
+				"0 0 0 0.5 400 -2266 -196 -116 659 -1 -1 " +
+				"1 1 0 1.5 400 -1944 2960 285 197 -1 -1 " +
+				"2 2 0 1.0 400 -1196 3699 191 612 -1 -1 " +
+				"3 0 1 0.5 400 -1372 4799 61 -175 -1 -1 " +
+				"4 1 1 1.5 400 -322 -860 343 90 -1 -1 " +
+				"5 2 1 1.0 400 -477 -1685 75 -80 -1 -1 " +
+				"6 0 2 0.5 400 2024 2018 455 -693 -1 -1 " +
+				"7 1 2 1.5 400 2559 259 43 -84 -1 -1 " +
+				"8 2 2 1.0 400 -3004 311 -112 469 -1 -1 " +
+				"20 3 -1 4.5 600 3453 -6695 76 -147 4 4 " +
+				"24 3 -1 7.0 850 481 -3299 15 -101 9 9 " +
+				"32 3 -1 4.5 600 394 2717 14 132 4 4 " +
+				"37 3 -1 3.5 700 -2542 -1529 324 175 2 6 " +
+				"40 3 -1 3.0 800 -5479 -633 252 29 1 8 " +
+				"42 3 -1 3.0 850 6532 4221 -256 -165 1 9 " +
+				"29 4 -1 -1.0 750 -2493 1273 0 0 3 -1 " +
+				"31 4 -1 -1.0 750 -1343 4183 0 0 5 -1 " +
+				"36 4 -1 -1.0 600 -2442 -451 0 0 3 -1 " +
+				"39 4 -1 -1.0 850 -3327 1933 0 0 1 -1 " +
+				"41 4 -1 -1.0 750 2594 949 0 0 7 -1 " +
+				"43 6 -1 -1.0 1000 -2442 -451 0 0 2 -1";
+
+		Player.Game game = new Player.Game(Player.CURRENT_VERSION);
+		game.createFromInputLines(new Scanner(raw));
+
+		Player.Game duplicateGame = new Player.Game(game);
+
+		Assert.assertTrue(duplicateGame.skillEffects.size() == 1);
+		for (int i = 0; i < game.skillEffects.size(); i++)
+		{
+			Assert.assertTrue(duplicateGame.skillEffects.iterator().next().x == game.skillEffects.iterator().next().x);
+			Assert.assertTrue(duplicateGame.skillEffects.iterator().next().y == game.skillEffects.iterator().next().y);
+		}
+	}
+
 //	@Test
 //	public void test_run() throws Exception
 //	{
