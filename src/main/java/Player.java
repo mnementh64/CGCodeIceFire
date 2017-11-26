@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
@@ -545,6 +544,56 @@ class Player
 
 		private static Action doofAction(Game game)
 		{
+			Looter target = null;
+			InnerPlayer me = game.innerPlayers.get(0);
+			Looter reaper0 = game.looters.get(0);
+			Looter reaper1 = game.looters.get(3);
+			Looter reaper2 = game.looters.get(6);
+			if (me.rage > REAPER_SKILL_COST) // enough rage ?
+			{
+				// alternative action : launch a oil
+				// look if an opponent reaper in a wreck
+				boolean isReaper1InWreck = isReaperInWreck(game, reaper1) && reaper1.isInRange(reaper0, 2000); // also within skill range ?
+				boolean isReaper2InWreck = isReaperInWreck(game, reaper2) && reaper2.isInRange(reaper0, 2000); // also within skill range ?
+
+				if (isReaper1InWreck && !isReaper2InWreck)
+				{
+					target = reaper1;
+				}
+				else if (!isReaper1InWreck && isReaper2InWreck)
+				{
+					target = reaper2;
+				}
+				else if (isReaper1InWreck)
+				{
+					if (game.innerPlayers.get(1).score > game.innerPlayers.get(2).score)
+						target = reaper1;
+					else
+						target = reaper2;
+				}
+
+				if (target != null)
+				{
+					// if my reaper is too close, cancel
+					Looter myReaper = game.looters.get(0);
+					if (!myReaper.isInRange(target, DESTROYER_SKILL_RADIUS))
+					{
+						if (DEBUG_SOLUTION)
+						{
+							System.err.println("Launch oil to " + target.x + "," + target.y);
+						}
+						return actionSkill(new Double(target.x).intValue(), new Double(target.y).intValue());
+					}
+					else
+					{
+						if (DEBUG_SOLUTION)
+						{
+							System.err.println("Cancel oil --> reaper too close !");
+						}
+					}
+				}
+			}
+
 			return targetWinnerReaper(game);
 		}
 
@@ -613,60 +662,6 @@ class Player
 			action.x = x;
 			action.y = y;
 			return action;
-		}
-
-		public List<RoundAction> fullActionRandom(Random random, int nbForceWait, int depth)
-		{
-			List<RoundAction> actions = new ArrayList<>();
-//			for (int i = 0; i < depth; i++)
-//			{
-//				RoundAction roundAction = new RoundAction();
-//				roundAction.actions = roundActionRandom(random, nbForceWait);
-//				actions.add(roundAction);
-//			}
-
-			RoundAction roundAction = new RoundAction();
-			roundAction.actions = roundActionRandom(random, nbForceWait);
-			for (int i = 0; i < depth; i++)
-			{
-				actions.add(roundAction);
-			}
-
-			return actions;
-		}
-
-		public List<Action> roundActionRandom(Random random, int nbForceWait)
-		{
-			List<Action> actions = new ArrayList<>();
-
-			for (int i = 0; i < 3 - nbForceWait; i++)
-			{
-				// random type
-				int type = random.nextInt(100);
-				if (type >= 0 && type <= 100)
-				{
-					Wreck wreck = wrecks.get(random.nextInt(wrecks.size()));
-					actions.add(actionMove((int) Math.round(wreck.x), (int) Math.round(wreck.y), 300));
-//					actions.add(actionMove(random.nextInt(6000) - 3000, random.nextInt(6000) - 3000, random.nextInt(300)));
-				}
-				else if (type > 75 && type <= 90)
-					actions.add(actionWait());
-				else
-					// TODO : implement skills
-					actions.add(actionWait());
-			}
-			for (int i = 3 - nbForceWait; i < 3; i++)
-			{
-				actions.add(actionWait());
-			}
-
-			// for opponent
-			for (int i = 1; i < 7; i++)
-			{
-				actions.add(actionWait());
-			}
-
-			return actions;
 		}
 
 		public int evaluate()
