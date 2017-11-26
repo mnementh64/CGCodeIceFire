@@ -407,6 +407,18 @@ class Player
 				{
 					continue;
 				}
+				// if oil on wreck, skip it
+				if (isOilOnTarget(game, wreck))
+				{
+					continue;
+				}
+
+				// if tanker on target, skip it
+				if (tankerOnTarget(game, wreck))
+				{
+					continue;
+				}
+
 				double distance = wreck.distance(looter);
 				if (distance < distanceMin)
 				{
@@ -433,6 +445,16 @@ class Player
 			}
 
 			return targetWinnerReaper(game);
+		}
+
+		private static boolean tankerOnTarget(Game game, Point target)
+		{
+			return game.tankers.stream().anyMatch(tanker -> tanker.isInRange(target, tanker.radius));
+		}
+
+		private static boolean isOilOnTarget(Game game, Point target)
+		{
+			return game.skillEffects.stream().anyMatch(effect -> effect.isInRange(target, DOOF_SKILL_RADIUS));
 		}
 
 		private static Action destroyerAction(Game game)
