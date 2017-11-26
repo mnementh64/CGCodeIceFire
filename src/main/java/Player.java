@@ -17,6 +17,7 @@ class Player
 	static boolean DEBUG = false;
 	static boolean DEBUG_SOLUTION = true;
 	static boolean DEBUG_INPUT = true;
+	private static final boolean SORT_WRECK_BY_INTEREST = false;
 	private static final long GAME_TIME_LIMIT_FIRST = 960;
 	private static final long GAME_TIME_LIMIT = 40;
 
@@ -398,12 +399,13 @@ class Player
 		static class WreckInterest
 		{
 
-			Wreck wreck;
+			Point target;
 			int score;
 
-			public WreckInterest(Wreck wreck)
+			public WreckInterest(Point point, int score)
 			{
-				this.wreck = wreck;
+				this.target = point;
+				this.score = score;
 			}
 		}
 
@@ -412,40 +414,45 @@ class Player
 			Point target = null;
 			double distanceMin = Double.MAX_VALUE;
 			int power = 0;
-			Looter looter = game.looters.get(0);
 
 			// sort wreck by their interest (the number of other wrecks they intersect)
-			List<WreckInterest> wrecksByInterest = sortWrecksByInterest(game);
-			if (!wrecksByInterest.isEmpty())
+			if (Player.SORT_WRECK_BY_INTEREST)
 			{
-				target = wrecksByInterest.get(0).wreck;
+				List<WreckInterest> wrecksByInterest = sortWrecksByInterest(game);
+				if (!wrecksByInterest.isEmpty())
+				{
+					target = wrecksByInterest.get(0).target;
+				}
 			}
+			else
+			{
+				Looter looter = game.looters.get(0);
+				for (Wreck wreck : game.wrecks)
+				{
+					if (wreck.water <= 0)
+					{
+						continue;
+					}
+					// if oil on wreck, skip it
+					if (isOilOnTarget(game, wreck))
+					{
+						continue;
+					}
 
-//			for (Wreck wreck : game.wrecks)
-//			{
-//				if (wreck.water <= 0)
-//				{
-//					continue;
-//				}
-//				// if oil on wreck, skip it
-//				if (isOilOnTarget(game, wreck))
-//				{
-//					continue;
-//				}
-//
-//				// if tanker on target, skip it
-//				if (isTankerOnTarget(game, wreck))
-//				{
-//					continue;
-//				}
-//
-//				double distance = wreck.distance(looter);
-//				if (distance < distanceMin)
-//				{
-//					distanceMin = distance;
-//					target = wreck;
-//				}
-//			}
+					// if tanker on target, skip it
+					if (isTankerOnTarget(game, wreck))
+					{
+						continue;
+					}
+
+					double distance = wreck.distance(looter);
+					if (distance < distanceMin)
+					{
+						distanceMin = distance;
+						target = wreck;
+					}
+				}
+			}
 			if (target != null)
 			{
 				power = distanceMin <= 300 ? (int) (distanceMin / 10) : 300;
@@ -469,12 +476,19 @@ class Player
 
 		public static List<WreckInterest> sortWrecksByInterest(Game game)
 		{
+			Looter myReaper = game.looters.get(0);
 			List<WreckInterest> wreckByInterest = game.wrecks.stream()
 					.filter(wreck -> wreck.water > 0 && !isOilOnTarget(game, wreck) && !isTankerOnTarget(game, wreck))
 					.map(wreck ->
 					{
-						WreckInterest wi = new WreckInterest(wreck);
-						wi.score = wreck.water;
+						int score = wreck.water;
+
+						//						System.err.println("Wreck " + wreck.id + " - initial score : " + wreck.water);
+
+						double totalX = wreck.radius * wreck.x;
+						double totalY = wreck.radius * wreck.y;
+						double totalRadius = wreck.radius;
+
 						for (Wreck w : game.wrecks)
 						{
 							if (w.id == wreck.id)
@@ -483,16 +497,29 @@ class Player
 							}
 
 							// other wreck is at distance
-							if (w.distance(wreck) < (wreck.radius + w.radius) / 2)
+							double distanceToWreck = w.distance(wreck);
+							//							System.err.println("\tdistance to wreck " + w.id + " : " + distanceToWreck + " compare to radius " + );
+							if (distanceToWreck < (wreck.radius + w.radius) / 1.25)
 							{
-//								System.out.println("Wreck " + wreck.id + " intersect " + w.id);
-								wi.score += w.water;
+								score += 2 * w.water; // wreck superposition values a lot !
+								totalX += w.radius * w.x;
+								totalY += w.radius * w.y;
+								totalRadius += w.radius;
+								//								System.err.println("\tWreck " + wreck.id + " intersect " + w.id + " -> add water " + w.water + " to score " + score);
 							}
 						}
 
-						wi.score = -wi.score;// negative value to use natural order
+						// compute the target
+						Point target = new Point(totalX / totalRadius, totalY / totalRadius);
 
-						return wi;
+						// minus the score with the distance -> 1 pt every 1000
+						double otherWreckDistance = myReaper.distance(target);
+						score -= otherWreckDistance / 500;
+						//						System.err.println("\tAdjust by distance " + otherWreckDistance + " to score " + score);
+
+						score = -score;// negative value to use natural order
+
+						return new WreckInterest(target, score);
 					}).collect(Collectors.toList());
 			wreckByInterest.sort(Comparator.comparingInt(value -> value.score));
 
@@ -627,8 +654,8 @@ class Player
 			{
 				// alternative action : launch a oil
 				// look if an opponent reaper in a wreck
-				boolean isReaper1InWreck = isReaperInWreck(game, reaper1) && reaper1.isInRange(reaper0, 2000); // also within skill range ?
-				boolean isReaper2InWreck = isReaperInWreck(game, reaper2) && reaper2.isInRange(reaper0, 2000); // also within skill range ?
+				boolean isReaper1InWreck = isReaperInWreck(game, reaper1) && !reaper1.isInRange(reaper0, 2000); // also within skill range ?
+				boolean isReaper2InWreck = isReaperInWreck(game, reaper2) && !reaper2.isInRange(reaper0, 2000); // also within skill range ?
 
 				if (isReaper1InWreck && !isReaper2InWreck)
 				{
