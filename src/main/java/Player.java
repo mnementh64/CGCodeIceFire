@@ -1,8 +1,8 @@
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 class Player {
 
@@ -117,10 +117,13 @@ class Game {
     }
 
     private void trainUnits() {
-        Position trainingPosition = findTrainingPosition();
-        if (gold > (nbMyUnits * 1) || nbRounds == 1) {
-            output.add(new Command(CommandType.TRAIN, 1, trainingPosition));
-        }
+//        Position trainingPosition = findTrainingPosition();
+//        if (gold > (nbMyUnits * 1) || nbRounds == 1) {
+//            output.add(new Command(CommandType.TRAIN, 1, trainingPosition));
+//        }
+
+        List<Position> allPositions = gameBoard.listCellsNeutralOrBelongToOpponent();
+        allPositions.forEach(p -> output.add(new Command(CommandType.TRAIN, 1, p)));
     }
 
     // move to the center
@@ -252,11 +255,20 @@ class GameBoard {
         }
     }
 
-    public void clear() {
+    List<Position> listCellsNeutralOrBelongToOpponent() {
+        return cells.stream()
+                .filter(c -> c.cellType.equals(GameCellType.NEUTRAL) ||
+                        c.cellType.equals(GameCellType.NOT_OWNED_AND_ACTIVE) ||
+                        c.cellType.equals(GameCellType.NOT_OWNED_AND_INACTIVE))
+                .map(c -> c.p)
+                .collect(Collectors.toList());
+    }
+
+    void clear() {
         cells.clear();
     }
 
-    public void opponentUnitAt(int level, int x, int y) {
+    void opponentUnitAt(int level, int x, int y) {
         GameCell cell = cells.get(y * 12 + x);
         cell.setLevelOfOpponentUnit(level);
     }
@@ -368,73 +380,75 @@ class Unit extends GameItem {
     }
 
     public List<Position> locateCandidatePositions(GameBoard gameBoard, Position myHQ, Position otherHQ) {
-        Map<Integer, List<Position>> candidates = new HashMap<>();
+//        Map<Integer, List<Position>> candidates = new HashMap<>();
+//
+//        /*
+//            For highest to lowest priority :
+//            - 0 : opponent HQ
+//            - 1 : not owned active with opponent
+//            - 2 : not owned active
+//            - 3 : not owned inactive
+//            - 4 : neutral
+//            - 5 : owned (active / inactive)
+//            - none : is not a candidate
+//         */
+//        for (GameCell cell : gameBoard.cells) {
+//
+//            if ((cell.p.x == myHQ.x && cell.p.y == myHQ.y) ||   // skip my HQ
+//                    (cell.p.x == p.x && cell.p.y == p.y) ||   // skip my position
+//                    cell.cellType.equals(GameCellType.VOID)) {  // skip void cells
+//                continue;
+//            }
+//
+//            int priority = -1;
+//            if (cell.cellType.equals(GameCellType.NEUTRAL)) {
+//                priority = 4;
+//            } else {
+//                // consider other possibilities only if we are close enough
+//                int distance = Math.abs(p.x - cell.p.x) + Math.abs(p.y - cell.p.y);
+//                if (distance < 3) {
+//                    if (cell.p.x == otherHQ.x && cell.p.y == otherHQ.y) {
+//                        priority = 0;
+//                    } else if (cell.cellType.equals(GameCellType.NOT_OWNED_AND_ACTIVE)) {
+//                        int levelOfOpponenetOnCell = cell.getLevelOfOpponentUnit();
+//                        if (levelOfOpponenetOnCell == 1) { // the only level we coudl defeat for the moment !
+//                            priority = 1;
+//                        } else {
+//                            priority = 2;
+//                        }
+//                    } else if (cell.cellType.equals(GameCellType.NOT_OWNED_AND_INACTIVE)) {
+//                        priority = 3;
+//                    }
+//                }
+//            }
+//
+//            // ignore default cells
+//            if (priority == -1) {
+//                continue;
+//            }
+//
+//            List<Position> positions = candidates.computeIfAbsent(priority, k -> new ArrayList<>());
+//            positions.add(cell.p);
+//        }
+//
+//        if (Player.DEBUG) {
+//            for (int priority = 0; priority < 6; priority++) {
+//                if (candidates.containsKey(priority)) {
+//                    System.err.println("Prio " + priority + " : " + candidates.get(priority).size() + " candidates");
+//                }
+//            }
+//        }
+//
+//        // ignore priority -1 -> it means no interest
+//        for (int priority = 0; priority < 6; priority++) {
+//            if (candidates.containsKey(priority)) {
+//                return candidates.get(priority);
+//            }
+//        }
+//
+//        return new ArrayList<>();
 
-        /*
-            For highest to lowest priority :
-            - 0 : opponent HQ
-            - 1 : not owned active with opponent
-            - 2 : not owned active
-            - 3 : not owned inactive
-            - 4 : neutral
-            - 5 : owned (active / inactive)
-            - none : is not a candidate
-         */
-        for (GameCell cell : gameBoard.cells) {
-
-            if ((cell.p.x == myHQ.x && cell.p.y == myHQ.y) ||   // skip my HQ
-                    (cell.p.x == p.x && cell.p.y == p.y) ||   // skip my position
-                    cell.cellType.equals(GameCellType.VOID)) {  // skip void cells
-                continue;
-            }
-
-            int priority = -1;
-            if (cell.cellType.equals(GameCellType.NEUTRAL)) {
-                priority = 4;
-            } else {
-                // consider other possibilities only if we are close enough
-                int distance = Math.abs(p.x - cell.p.x) + Math.abs(p.y - cell.p.y);
-                if (distance < 3) {
-                    if (cell.p.x == otherHQ.x && cell.p.y == otherHQ.y) {
-                        priority = 0;
-                    } else if (cell.cellType.equals(GameCellType.NOT_OWNED_AND_ACTIVE)) {
-                        int levelOfOpponenetOnCell = cell.getLevelOfOpponentUnit();
-                        if (levelOfOpponenetOnCell == 1) { // the only level we coudl defeat for the moment !
-                            priority = 1;
-                        } else {
-                            priority = 2;
-                        }
-                    } else if (cell.cellType.equals(GameCellType.NOT_OWNED_AND_INACTIVE)) {
-                        priority = 3;
-                    }
-                }
-            }
-
-            // ignore default cells
-            if (priority == -1) {
-                continue;
-            }
-
-            List<Position> positions = candidates.computeIfAbsent(priority, k -> new ArrayList<>());
-            positions.add(cell.p);
-        }
-
-        if (Player.DEBUG) {
-            for (int priority = 0; priority < 6; priority++) {
-                if (candidates.containsKey(priority)) {
-                    System.err.println("Prio " + priority + " : " + candidates.get(priority).size() + " candidates");
-                }
-            }
-        }
-
-        // ignore priority -1 -> it means no interest
-        for (int priority = 0; priority < 6; priority++) {
-            if (candidates.containsKey(priority)) {
-                return candidates.get(priority);
-            }
-        }
-
-        return new ArrayList<>();
+        return Collections.singletonList(otherHQ);
     }
 
 }
